@@ -7,6 +7,7 @@ import json
 import os
 import re
 import tempfile
+import time
 import uuid
 from pathlib import Path
 
@@ -167,6 +168,23 @@ def _detect_write_intent(text: str) -> tuple[bool, int | None]:
     return True, qid
 
 
+# Claros output phrases that indicate it is about to write or has confirmed writing (voice trigger from output_transcription).
+_CLAROS_WRITE_PHRASE_RE = re.compile(
+    r"\b(I'll write that|writing that down|here is the answer|the answer is|let me write)\b",
+    re.IGNORECASE,
+)
+
+
+def _detect_write_from_output(text: str) -> tuple[bool, int | None]:
+    """Returns (has_trigger, question_id or None). Used on Claros output_transcription to trigger write without turn_complete."""
+    if not text or not _CLAROS_WRITE_PHRASE_RE.search(text):
+        return False, None
+    m = _QUESTION_NUM_RE.search(text)
+    qid = int(m.group(1)) if m else 1
+    print(f"[_detect_write_from_output] output={text[:80]!r}... -> question_id={qid}")
+    return True, qid
+
+
 @app.websocket("/session/{assignment_id}")
 async def ws_session(websocket: WebSocket, assignment_id: str):
     """Assignment-aware voice session: loads assignment, injects into prompt. Write actions via separate text API."""
@@ -187,7 +205,7 @@ async def ws_session(websocket: WebSocket, assignment_id: str):
     client = genai.Client(api_key=api_key, http_options={"api_version": "v1alpha"})
     model = "gemini-2.5-flash-native-audio-preview-12-2025"
     config = types.LiveConnectConfig(
-        response_modalities=[types.Modality.AUDIO, types.Modality.TEXT],
+        response_modalities=[types.Modality.AUDIO],
         speech_config=types.SpeechConfig(
             voice_config=types.VoiceConfig(
                 prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Puck")
@@ -208,6 +226,10 @@ async def ws_session(websocket: WebSocket, assignment_id: str):
     conversation_context: list[tuple[str, str]] = []
     last_write_trigger_text: str | None = None  # debounce: avoid re-triggering on same utterance
     user_transcript_buffer: str = ""  # accumulate input_transcription fragments until turn_complete
+    # Output-transcription trigger: watch Claros's words for write phrases (no turn_complete needed).
+    claros_output_buffer: str = ""
+    last_output_write_trigger_time: float = 0.0
+    OUTPUT_WRITE_DEBOUNCE_SEC = 5.0
 
     async def generate_write_response(question_id: int, context_snapshot: list[tuple[str, str]]):
         """Call standard Gemini text API to generate answer for question_id; stream as write_token."""
@@ -305,6 +327,7 @@ The student has asked to have their answer for Question {question_id} written do
 
     async def receive_from_gemini_and_forward(session):
         nonlocal recv_task, last_write_trigger_text, write_task, user_transcript_buffer
+        nonlocal claros_output_buffer, last_output_write_trigger_time
         while True:
             try:
                 async for response in session.receive():
@@ -322,6 +345,19 @@ The student has asked to have their answer for Question {question_id} written do
                         text = sc.output_transcription.text
                         conversation_context.append(("claros", text))
                         await send_json({"type": "transcript", "speaker": "claros", "text": text})
+                        # Voice trigger from Claros output: when Claros says it will write, trigger immediately.
+                        claros_output_buffer += text
+                        if len(claros_output_buffer) > 2000:
+                            claros_output_buffer = claros_output_buffer[-1000:]
+                        has_trigger, qid = _detect_write_from_output(claros_output_buffer)
+                        if has_trigger and qid is not None and (time.monotonic() - last_output_write_trigger_time) >= OUTPUT_WRITE_DEBOUNCE_SEC:
+                            last_output_write_trigger_time = time.monotonic()
+                            claros_output_buffer = ""
+                            if write_task is not None and not write_task.done():
+                                write_task.cancel()
+                            context_snapshot = list(conversation_context)
+                            write_task = asyncio.create_task(generate_write_response(qid, context_snapshot))
+                            print(f"[session] Output-transcription trigger: generate_write_response for question_id={qid}")
                     if sc.model_turn and sc.model_turn.parts:
                         for part in sc.model_turn.parts:
                             if part.inline_data and part.inline_data.data:
@@ -365,6 +401,19 @@ The student has asked to have their answer for Question {question_id} written do
                     continue
                 if msg.get("type") == "websocket.disconnect":
                     break
+                # Manual write trigger: button click sends {type: 'manual_write', question_id: N}.
+                if "text" in msg:
+                    try:
+                        data = json.loads(msg["text"])
+                        if data.get("type") == "manual_write":
+                            qid = int(data.get("question_id", 1))
+                            if write_task is not None and not write_task.done():
+                                write_task.cancel()
+                            context_snapshot = list(conversation_context)
+                            write_task = asyncio.create_task(generate_write_response(qid, context_snapshot))
+                            print(f"[session] Manual write trigger: generate_write_response for question_id={qid}")
+                    except (json.JSONDecodeError, ValueError, KeyError):
+                        pass
                 # Only enqueue when binary audio payload is present (avoids KeyError).
                 if "bytes" in msg:
                     chunk = msg["bytes"]

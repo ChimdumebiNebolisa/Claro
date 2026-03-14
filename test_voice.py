@@ -2,6 +2,7 @@
 Milestone 1 — Minimal voice test: Gemini Live API.
 Streams microphone audio to Gemini, plays response through speakers.
 Interruption (barge-in) works because we keep sending mic; API handles it.
+Reconnects automatically on connection drop; keepalive prevents ping timeout.
 Run: python test_voice.py   (Ctrl+C to exit)
 """
 import asyncio
@@ -21,6 +22,11 @@ from google.genai import types
 import sounddevice as sd
 import numpy as np
 
+try:
+    from websockets.exceptions import ConnectionClosedError as WsConnectionClosedError
+except ImportError:
+    WsConnectionClosedError = None  # fallback to name check
+
 # Gemini Live: input PCM 16-bit 16kHz mono, output PCM 16-bit 24kHz mono
 SAMPLE_RATE_IN = 16000
 SAMPLE_RATE_OUT = 24000
@@ -30,6 +36,9 @@ BYTES_PER_SAMPLE = 2
 # ~20ms frames
 BLOCK_SAMPLES_IN = 320  # 20ms at 16kHz
 BLOCK_BYTES_IN = BLOCK_SAMPLES_IN * BYTES_PER_SAMPLE
+# Keepalive: send silent PCM every N seconds to prevent WebSocket ping timeout
+KEEPALIVE_INTERVAL = 5
+SILENT_CHUNK = (np.zeros(BLOCK_SAMPLES_IN, dtype=np.int16)).tobytes()
 
 
 def get_api_key():
@@ -55,6 +64,18 @@ async def send_mic_to_session(session, stream):
             chunk = (block * 32767).astype(np.int16).tobytes()
             await session.send_realtime_input(
                 audio=types.Blob(data=chunk, mime_type="audio/pcm;rate=16000")
+            )
+    except asyncio.CancelledError:
+        pass
+
+
+async def keepalive_loop(session):
+    """Send a silent audio chunk every KEEPALIVE_INTERVAL seconds to prevent WebSocket ping timeout."""
+    try:
+        while True:
+            await asyncio.sleep(KEEPALIVE_INTERVAL)
+            await session.send_realtime_input(
+                audio=types.Blob(data=SILENT_CHUNK, mime_type="audio/pcm;rate=16000")
             )
     except asyncio.CancelledError:
         pass
@@ -87,6 +108,30 @@ async def receive_and_play(session):
         pass
 
 
+def _is_connection_error(e: BaseException) -> bool:
+    """True if the exception indicates a dropped connection (reconnect is appropriate)."""
+    if WsConnectionClosedError is not None and isinstance(e, WsConnectionClosedError):
+        return True
+    if isinstance(e, (TimeoutError, OSError, ConnectionError)):
+        return True
+    msg = str(e).lower()
+    return "connection" in msg or "timeout" in msg or "closed" in msg or "1011" in msg
+
+
+async def run_one_session(client, model, config, stream):
+    """Run a single Gemini Live session. Raises on connection drop or CancelledError."""
+    async with client.aio.live.connect(model=model, config=config) as session:
+        send_task = asyncio.create_task(send_mic_to_session(session, stream))
+        recv_task = asyncio.create_task(receive_and_play(session))
+        keepalive_task = asyncio.create_task(keepalive_loop(session))
+        try:
+            await asyncio.gather(send_task, recv_task, keepalive_task)
+        finally:
+            for t in (send_task, recv_task, keepalive_task):
+                t.cancel()
+            await asyncio.gather(send_task, recv_task, keepalive_task, return_exceptions=True)
+
+
 async def main():
     api_key = get_api_key()
     client = genai.Client(api_key=api_key, http_options={"api_version": "v1alpha"})
@@ -105,6 +150,7 @@ async def main():
 
     print("Starting Gemini Live session. Speak into your mic. Ctrl+C to exit.")
     print("(Interruption: speak over the assistant; it will stop and listen.)")
+    print("(Connection drops will auto-reconnect.)")
 
     stream = sd.InputStream(
         samplerate=SAMPLE_RATE_IN,
@@ -114,19 +160,22 @@ async def main():
     )
     stream.start()
 
-    async with client.aio.live.connect(model=model, config=config) as session:
-        send_task = asyncio.create_task(send_mic_to_session(session, stream))
-        recv_task = asyncio.create_task(receive_and_play(session))
-        try:
-            await asyncio.gather(send_task, recv_task)
-        except asyncio.CancelledError:
-            send_task.cancel()
-            recv_task.cancel()
-            await asyncio.gather(send_task, recv_task, return_exceptions=True)
-
-    stream.stop()
-    stream.close()
-    print("Session ended.")
+    try:
+        while True:
+            try:
+                await run_one_session(client, model, config, stream)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                if _is_connection_error(e):
+                    print(f"Connection dropped: {e}. Reconnecting in 2s...")
+                    await asyncio.sleep(2)
+                else:
+                    raise
+    finally:
+        stream.stop()
+        stream.close()
+        print("Session ended.")
 
 
 if __name__ == "__main__":

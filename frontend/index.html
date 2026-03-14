@@ -64,6 +64,11 @@
     .btn.export:hover { background: #4b5563; }
     .btn.export { display: none; }
     .btn.export.visible { display: block; }
+    .btn-write-answer {
+      font-size: 0.8rem; padding: 0.35rem 0.6rem; margin-top: 0.35rem; width: auto;
+      background: #374151; color: #e2e4e8;
+    }
+    .btn-write-answer:hover { background: #4b5563; }
     .errors { font-size: 0.85rem; color: #fca5a5; margin-top: 0.5rem; min-height: 1.5rem; }
   </style>
 </head>
@@ -184,6 +189,16 @@
             console.log('[renderQuestions] Card for Q' + q.id + ': set question-text to', questionText ? questionText.substring(0, 50) + (questionText.length > 50 ? '...' : '') : '(empty)');
           }
           answerEl.addEventListener('input', () => { state.answers[q.id] = answerEl.textContent; });
+          const writeAnswerBtn = document.createElement('button');
+          writeAnswerBtn.type = 'button';
+          writeAnswerBtn.className = 'btn btn-write-answer';
+          writeAnswerBtn.textContent = 'Write Answer';
+          writeAnswerBtn.addEventListener('click', function () {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'manual_write', question_id: q.id }));
+            }
+          });
+          card.appendChild(writeAnswerBtn);
           questionsContainer.appendChild(card);
         });
         console.log('[renderQuestions] Created', state.questions?.length || 0, 'card(s). DOM children:', questionsContainer.children.length);

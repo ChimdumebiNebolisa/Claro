@@ -1,9 +1,7 @@
 """
-PDF question extraction for Claros. Uses PyMuPDF with heuristics:
-- Numbered lines (1. 2) etc.)
-- Lines containing ?
-- Lines with larger font than body
-Fallback: if fewer than 2 questions, return full text as single block (id: 0).
+PDF question extraction for Claros. Handles PDFs where questions are on lines
+starting with "Question 1:", "Question 2:", etc. Falls back to full text as
+single block (id=0) if no such lines are found.
 """
 import re
 from dataclasses import dataclass
@@ -17,6 +15,10 @@ import fitz  # PyMuPDF
 class Question:
     id: int
     text: str
+
+
+# Line starting with "Question N:" (case insensitive). Captures N and rest of line.
+_QUESTION_LINE_RE = re.compile(r"^\s*Question\s*(\d+)\s*:\s*(.*)", re.IGNORECASE)
 
 
 def _extract_lines_with_size(doc: fitz.Document) -> List[tuple[str, float]]:
@@ -41,73 +43,51 @@ def _extract_lines_with_size(doc: fitz.Document) -> List[tuple[str, float]]:
     return lines
 
 
-def _body_font_size(lines: List[tuple[str, float]]) -> float:
-    """Median font size of lines that don't look like headers (no leading digit, no ?)."""
-    sizes = [s for _, s in lines if s and s > 0]
-    if not sizes:
-        return 12.0
-    sizes.sort()
-    return sizes[len(sizes) // 2]
-
-
-# Numbered line: "1." "2)" "10." etc.
-_NUMBERED_START = re.compile(r"^\s*\d+[.)]\s*")
-# Line contains a question mark
-_HAS_QUESTION = re.compile(r"\?")
-
-
-def _is_question_boundary(line: str, size: float, body_size: float) -> bool:
-    if _NUMBERED_START.match(line):
-        return True
-    if _HAS_QUESTION.search(line):
-        return True
-    if body_size > 0 and size > body_size * 1.15:  # header-sized
-        return True
-    return False
-
-
 def parse_pdf(pdf_path: str | Path) -> tuple[str, List[Question]]:
     """
-    Parse PDF and extract questions. Returns (title, questions).
-    Title is derived from first line or filename. If fewer than 2 questions,
-    returns one question with id=0 and full text as fallback.
+    Parse PDF and extract questions. Expects lines like "Question 1: ...", "Question 2: ...".
+    Returns (title, questions). Title is the first line. If no "Question N:" lines found,
+    returns one question with id=0 and full text.
     """
     path = Path(pdf_path)
     doc = fitz.open(path)
     try:
         lines_with_size = _extract_lines_with_size(doc)
-        if not lines_with_size:
-            full_text = ""
-            for page in doc:
-                full_text += page.get_text()
-            full_text = full_text.strip() or "(No extractable text)"
-            return path.stem, [Question(id=0, text=full_text)]
+        lines = [t for t, _ in lines_with_size]
+        full_text = "\n".join(lines).strip() or "(No extractable text)"
 
-        body_size = _body_font_size(lines_with_size)
-        title = lines_with_size[0][0][:80] if lines_with_size else path.stem
+        if not lines:
+            title = path.stem
+            result = title, [Question(id=0, text=full_text)]
+            print(f"[parser.py] No lines extracted. Returning: title={title!r}, 1 question (id=0)")
+            return result
 
+        title = lines[0].strip()[:80] if lines else path.stem
         questions: List[Question] = []
-        current_chunks: List[str] = []
+        i = 0
 
-        for line_text, size in lines_with_size:
-            if _is_question_boundary(line_text, size or 0, body_size):
-                if current_chunks:
-                    q_text = "\n".join(current_chunks).strip()
-                    if q_text:
-                        questions.append(Question(id=len(questions) + 1, text=q_text))
-                current_chunks = [line_text]
+        while i < len(lines):
+            m = _QUESTION_LINE_RE.match(lines[i])
+            if m:
+                qid = int(m.group(1))
+                # Strip "Question N:" prefix; rest of line is start of question text
+                text_parts = [m.group(2).strip()] if m.group(2).strip() else []
+                i += 1
+                # Collect lines until the next "Question N:" line
+                while i < len(lines) and not _QUESTION_LINE_RE.match(lines[i]):
+                    text_parts.append(lines[i])
+                    i += 1
+                q_text = "\n".join(text_parts).strip()
+                questions.append(Question(id=qid, text=q_text))
             else:
-                current_chunks.append(line_text)
+                i += 1
 
-        if current_chunks:
-            q_text = "\n".join(current_chunks).strip()
-            if q_text:
-                questions.append(Question(id=len(questions) + 1, text=q_text))
+        if not questions:
+            result = title, [Question(id=0, text=full_text)]
+            print(f"[parser.py] No 'Question N:' lines found. Fallback: title={title!r}, 1 question (id=0)")
+            return result
 
-        if len(questions) < 2:
-            full_text = "\n".join(t for t, _ in lines_with_size).strip()
-            return title, [Question(id=0, text=full_text)]
-
+        print(f"[parser.py] Returning: title={title!r}, {len(questions)} questions: {[(q.id, q.text[:60] + ('...' if len(q.text) > 60 else '')) for q in questions]}")
         return title, questions
     finally:
         doc.close()
