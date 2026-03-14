@@ -132,10 +132,12 @@ async def upload_assignment(file: UploadFile = File(...)):
         tmp_path = tmp.name
     try:
         title, questions = parse_pdf(tmp_path)
+        payload = [{"id": q.id, "text": q.text} for q in questions]
+        print(f"[POST /upload] Parsed questions before return: title={title!r}, count={len(payload)}, questions={payload}")
         return {
             "assignment_id": assignment_id,
             "title": title,
-            "questions": [{"id": q.id, "text": q.text} for q in questions],
+            "questions": payload,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"PDF parse failed: {e}")
@@ -156,10 +158,13 @@ _QUESTION_NUM_RE = re.compile(r"question\s*(\d+)", re.IGNORECASE)
 
 def _detect_write_intent(text: str) -> tuple[bool, int | None]:
     """Returns (has_intent, question_id or None). question_id defaults to 1 if intent but no number."""
-    if not text or not _WRITE_INTENT_RE.search(text):
+    has_intent = bool(text and _WRITE_INTENT_RE.search(text))
+    m = _QUESTION_NUM_RE.search(text) if text else None
+    qid = int(m.group(1)) if m else (1 if has_intent else None)
+    print(f"[_detect_write_intent] input={text!r} -> has_intent={has_intent}, question_id={qid}")
+    if not has_intent:
         return False, None
-    m = _QUESTION_NUM_RE.search(text)
-    return True, int(m.group(1)) if m else 1
+    return True, qid
 
 
 @app.websocket("/session/{assignment_id}")
@@ -182,7 +187,7 @@ async def ws_session(websocket: WebSocket, assignment_id: str):
     client = genai.Client(api_key=api_key, http_options={"api_version": "v1alpha"})
     model = "gemini-2.5-flash-native-audio-preview-12-2025"
     config = types.LiveConnectConfig(
-        response_modalities=[types.Modality.AUDIO],
+        response_modalities=[types.Modality.AUDIO, types.Modality.TEXT],
         speech_config=types.SpeechConfig(
             voice_config=types.VoiceConfig(
                 prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Puck")
@@ -202,6 +207,7 @@ async def ws_session(websocket: WebSocket, assignment_id: str):
     # Conversation context for the text model when generating written answers.
     conversation_context: list[tuple[str, str]] = []
     last_write_trigger_text: str | None = None  # debounce: avoid re-triggering on same utterance
+    user_transcript_buffer: str = ""  # accumulate input_transcription fragments until turn_complete
 
     async def generate_write_response(question_id: int, context_snapshot: list[tuple[str, str]]):
         """Call standard Gemini text API to generate answer for question_id; stream as write_token."""
@@ -250,6 +256,10 @@ The student has asked to have their answer for Question {question_id} written do
     keepalive_task = None
     write_task: asyncio.Task | None = None
 
+    FORWARD_AUDIO_SEND_TIMEOUT = 0.1
+    MAX_QUEUE_BEFORE_DRAIN = 5
+    QUEUE_SIZE_AFTER_DRAIN = 1
+
     async def forward_audio_to_gemini(session):
         nonlocal send_task
         try:
@@ -257,10 +267,26 @@ The student has asked to have their answer for Question {question_id} written do
                 chunk = await audio_queue.get()
                 if chunk is None:
                     break
-                await session.send_realtime_input(
-                    audio=types.Blob(data=chunk, mime_type="audio/pcm;rate=16000")
-                )
-                print(f"[session/{assignment_id}] forward_audio_to_gemini: sent chunk to Gemini ({len(chunk)} bytes)")
+                if audio_queue.qsize() >= MAX_QUEUE_BEFORE_DRAIN:
+                    drained = 0
+                    while audio_queue.qsize() > QUEUE_SIZE_AFTER_DRAIN:
+                        try:
+                            audio_queue.get_nowait()
+                            drained += 1
+                        except asyncio.QueueEmpty:
+                            break
+                    if drained:
+                        print(f"[session/{assignment_id}] forward_audio_to_gemini: drained {drained} stale chunk(s), queue now ~{audio_queue.qsize()}")
+                try:
+                    await asyncio.wait_for(
+                        session.send_realtime_input(
+                            audio=types.Blob(data=chunk, mime_type="audio/pcm;rate=16000")
+                        ),
+                        timeout=FORWARD_AUDIO_SEND_TIMEOUT,
+                    )
+                    print(f"[session/{assignment_id}] forward_audio_to_gemini: sent chunk to Gemini ({len(chunk)} bytes)")
+                except asyncio.TimeoutError:
+                    print(f"[session/{assignment_id}] forward_audio_to_gemini: send_realtime_input timed out after {FORWARD_AUDIO_SEND_TIMEOUT}s, dropping chunk")
         except asyncio.CancelledError:
             raise
         except Exception as e:
@@ -278,25 +304,20 @@ The student has asked to have their answer for Question {question_id} written do
             raise
 
     async def receive_from_gemini_and_forward(session):
-        nonlocal recv_task, last_write_trigger_text, write_task
+        nonlocal recv_task, last_write_trigger_text, write_task, user_transcript_buffer
         while True:
             try:
                 async for response in session.receive():
-                    if not response.server_content:
+                    sc = getattr(response, "server_content", None)
+                    turn_complete = getattr(sc, "turn_complete", False) if sc else False
+                    model_turn = bool(getattr(sc, "model_turn", None)) if sc else False
+                    input_trans = bool(getattr(sc, "input_transcription", None)) if sc else False
+                    output_trans = bool(getattr(sc, "output_transcription", None)) if sc else False
+                    print(f"[receive] turn_complete={turn_complete} model_turn={model_turn} input_trans={input_trans} output_trans={output_trans}")
+                    if not sc:
                         continue
-                    sc = response.server_content
                     if sc.input_transcription and sc.input_transcription.text:
-                        user_text = sc.input_transcription.text.strip()
-                        conversation_context.append(("user", user_text))
-                        await send_json({"type": "transcript", "speaker": "user", "text": user_text})
-                        # Detect write intent from user speech; trigger separate text generation.
-                        has_intent, qid = _detect_write_intent(user_text)
-                        if has_intent and qid is not None and (last_write_trigger_text is None or last_write_trigger_text != user_text):
-                            last_write_trigger_text = user_text
-                            if write_task is not None and not write_task.done():
-                                write_task.cancel()
-                            context_snapshot = list(conversation_context)
-                            write_task = asyncio.create_task(generate_write_response(qid, context_snapshot))
+                        user_transcript_buffer += sc.input_transcription.text
                     if sc.output_transcription and sc.output_transcription.text:
                         text = sc.output_transcription.text
                         conversation_context.append(("claros", text))
@@ -308,6 +329,19 @@ The student has asked to have their answer for Question {question_id} written do
                                 print(f"[session/{assignment_id}] receive_from_gemini_and_forward: received audio from Gemini ({len(data)} bytes), forwarding to browser")
                                 await send_json({"type": "audio", "data": base64.b64encode(data).decode()})
                     if getattr(sc, "turn_complete", False):
+                        full_utterance = user_transcript_buffer.strip()
+                        if full_utterance:
+                            conversation_context.append(("user", full_utterance))
+                            await send_json({"type": "transcript", "speaker": "user", "text": full_utterance})
+                            has_intent, qid = _detect_write_intent(full_utterance)
+                            if has_intent and qid is not None and (last_write_trigger_text is None or last_write_trigger_text != full_utterance):
+                                print(f"[session] Calling generate_write_response for question_id={qid}")
+                                last_write_trigger_text = full_utterance
+                                if write_task is not None and not write_task.done():
+                                    write_task.cancel()
+                                context_snapshot = list(conversation_context)
+                                write_task = asyncio.create_task(generate_write_response(qid, context_snapshot))
+                        user_transcript_buffer = ""
                         await send_json({"type": "status", "mode": "teaching"})
                         last_write_trigger_text = None  # allow next utterance to trigger again
                 await asyncio.sleep(1)

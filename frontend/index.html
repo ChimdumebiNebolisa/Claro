@@ -21,11 +21,15 @@
     }
     .upload-zone:hover { border-color: #f59e0b; }
     .upload-zone input { display: none; }
+    .upload-row { display: flex; gap: 0.75rem; align-items: stretch; margin-bottom: 1rem; }
+    .upload-row .upload-zone { flex: 1; margin-bottom: 0; }
+    .btn-test-pdf { flex-shrink: 0; margin-top: 0; width: auto !important; min-width: unset; padding: 0.5rem 0.75rem; font-size: 0.875rem; white-space: nowrap; }
     .question-card {
       background: #1a1d23; border: 1px solid #374151; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;
     }
     .question-card.writing { border-color: #f59e0b; box-shadow: 0 0 0 2px rgba(245,158,11,0.3); }
     .question-label { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem; color: #d1d5db; }
+    .question-text { font-size: 0.9rem; color: #9ca3af; margin-bottom: 0.75rem; white-space: pre-wrap; word-break: break-word; line-height: 1.4; }
     .answer-field {
       min-height: 60px; width: 100%; background: #111318; border: 1px solid #374151; border-radius: 4px;
       padding: 0.75rem; font-family: ui-monospace, monospace; font-size: 0.9rem; color: #e2e4e8;
@@ -67,9 +71,12 @@
   <div class="app">
     <div class="panel-left">
       <div class="assignment-title" id="assignmentTitle">Upload an assignment PDF</div>
-      <div class="upload-zone" id="uploadZone">
-        <input type="file" id="fileInput" accept=".pdf">
-        <span id="uploadLabel">Drop PDF or click to upload</span>
+      <div class="upload-row">
+        <div class="upload-zone" id="uploadZone">
+          <input type="file" id="fileInput" accept=".pdf">
+          <span id="uploadLabel">Drop PDF or click to upload</span>
+        </div>
+        <button type="button" class="btn btn-test-pdf" id="testPdfBtn">Use Test PDF</button>
       </div>
       <div id="questionsContainer"></div>
       <button class="btn export" id="exportBtn">Export to PDF</button>
@@ -115,6 +122,25 @@
         if (file) doUpload(file);
       });
 
+      const testPdfBtn = document.getElementById('testPdfBtn');
+      testPdfBtn.addEventListener('click', async () => {
+        uploadLabel.textContent = 'Loading test PDF…';
+        testPdfBtn.disabled = true;
+        errorsEl.textContent = '';
+        try {
+          const r = await fetch('/test-assignment.pdf');
+          if (!r.ok) throw new Error('Failed to load test PDF');
+          const blob = await r.blob();
+          const file = new File([blob], 'test_assignment.pdf', { type: 'application/pdf' });
+          await doUpload(file);
+        } catch (err) {
+          errorsEl.textContent = err.message || 'Failed to load test PDF';
+        } finally {
+          uploadLabel.textContent = 'Drop PDF or click to upload';
+          testPdfBtn.disabled = false;
+        }
+      });
+
       async function doUpload(file) {
         uploadLabel.textContent = 'Uploading…';
         errorsEl.textContent = '';
@@ -127,6 +153,7 @@
             throw new Error(err.detail || err.error || 'Upload failed');
           }
           const data = await r.json();
+          console.log('[doUpload] Full upload response:', JSON.stringify(data, null, 2));
           state.assignmentId = data.assignment_id;
           state.title = data.title || 'Assignment';
           state.questions = data.questions || [];
@@ -142,16 +169,24 @@
       }
 
       function renderQuestions() {
+        console.log('[renderQuestions] Received state.questions:', state.questions?.length, state.questions);
         questionsContainer.innerHTML = '';
         state.questions.forEach((q) => {
           const card = document.createElement('div');
           card.className = 'question-card';
           card.dataset.questionId = String(q.id);
-          card.innerHTML = '<div class="question-label">Question ' + q.id + '</div><div class="answer-field" data-question-id="' + q.id + '" contenteditable="true" spellcheck="true"></div>';
+          const questionText = (q.text != null && q.text !== '') ? String(q.text) : '';
+          card.innerHTML = '<div class="question-label">Question ' + q.id + '</div><div class="question-text"></div><div class="answer-field" data-question-id="' + q.id + '" contenteditable="true" spellcheck="true"></div>';
+          const questionTextEl = card.querySelector('.question-text');
           const answerEl = card.querySelector('.answer-field');
+          if (questionTextEl) {
+            questionTextEl.textContent = questionText;
+            console.log('[renderQuestions] Card for Q' + q.id + ': set question-text to', questionText ? questionText.substring(0, 50) + (questionText.length > 50 ? '...' : '') : '(empty)');
+          }
           answerEl.addEventListener('input', () => { state.answers[q.id] = answerEl.textContent; });
           questionsContainer.appendChild(card);
         });
+        console.log('[renderQuestions] Created', state.questions?.length || 0, 'card(s). DOM children:', questionsContainer.children.length);
       }
 
       function getAnswerEl(questionId) {
@@ -177,13 +212,38 @@
         statusEl.className = 'status ' + (mode === 'connecting' ? 'connecting' : mode === 'writing' ? 'writing' : mode === 'teaching' ? 'teaching' : 'idle');
       }
 
+      let pendingUserTranscript = '';
+      let pendingClarosFragments = [];
+
+      function flushPendingTranscripts() {
+        if (!pendingUserTranscript.trim() && pendingClarosFragments.length === 0) return;
+        if (pendingUserTranscript.trim()) {
+          const span = document.createElement('span');
+          span.className = 'user';
+          span.textContent = 'You: ' + pendingUserTranscript + '\n';
+          transcriptEl.appendChild(span);
+          pendingUserTranscript = '';
+        }
+        pendingClarosFragments.forEach(function (t) {
+          const span = document.createElement('span');
+          span.className = 'claros';
+          span.textContent = 'Claros: ' + t + '\n';
+          transcriptEl.appendChild(span);
+        });
+        pendingClarosFragments = [];
+        transcriptEl.scrollTop = transcriptEl.scrollHeight;
+      }
+
       function addTranscript(speaker, text) {
         if (!text.trim()) return;
-        const span = document.createElement('span');
-        span.className = speaker;
-        span.textContent = (speaker === 'user' ? 'You: ' : 'Claros: ') + text + '\n';
-        transcriptEl.appendChild(span);
-        transcriptEl.scrollTop = transcriptEl.scrollHeight;
+        if (speaker === 'user') {
+          pendingUserTranscript = (pendingUserTranscript + text).trim();
+          flushPendingTranscripts();
+          return;
+        }
+        if (speaker === 'claros') {
+          pendingClarosFragments.push(text);
+        }
       }
 
       function queuePcm24kChunk(base64Data) {
@@ -253,6 +313,7 @@
         processorNode = audioContext.createScriptProcessor(1024, 1, 1);
         processorNode.onaudioprocess = function (e) {
           if (!ws || ws.readyState !== WebSocket.OPEN) return;
+          /* Always send mic (no playback gate) so user can interrupt Claros (barge-in). */
           const input = e.inputBuffer.getChannelData(0);
           const outSamples = Math.floor(input.length / ratio);
           const out = new Int16Array(outSamples);
@@ -274,6 +335,7 @@
           if (typeof ev.data !== 'string') return;
           try {
             const msg = JSON.parse(ev.data);
+            console.log('[ws.onmessage] Received:', msg.type, msg);
             if (msg.type === 'status' && msg.mode) setStatus(msg.mode);
             else if (msg.type === 'transcript') addTranscript(msg.speaker || 'claros', msg.text || '');
             else if (msg.type === 'audio') queuePcm24kChunk(msg.data);
