@@ -16,7 +16,10 @@ if _env_path.exists():
     load_dotenv(_env_path)
 
 from fastapi import FastAPI, UploadFile, File, WebSocket, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi import Query
+
+from exporter import build_export_pdf
 
 from parser import parse_pdf, Question
 from agent import build_system_prompt, WriteTokenParser
@@ -63,8 +66,8 @@ def upload_pdf_to_gcs(assignment_id: str, pdf_bytes: bytes, filename: str = "ass
     return f"gs://{bucket.name}/assignments/{assignment_id}/{filename}"
 
 
-def load_assignment_text_from_gcs(assignment_id: str) -> str:
-    """Load PDF from GCS, parse, return assignment text for system prompt."""
+def load_assignment_from_gcs(assignment_id: str) -> tuple[str, list]:
+    """Load PDF from GCS, parse, return (title, questions) where questions = [{"id": n, "text": "..."}]."""
     bucket = get_gcs_bucket()
     prefix = f"assignments/{assignment_id}/"
     blobs = list(bucket.list_blobs(prefix=prefix))
@@ -77,15 +80,39 @@ def load_assignment_text_from_gcs(assignment_id: str) -> str:
         tmp_path = tmp.name
     try:
         title, questions = parse_pdf(tmp_path)
-        assignment_text = title + "\n\n" + "\n\n".join(
-            f"Question {q.id}: {q.text}" for q in questions
-        )
-        return assignment_text
+        return title, [{"id": q.id, "text": q.text} for q in questions]
     finally:
         try:
             os.unlink(tmp_path)
         except OSError:
             pass
+
+
+def load_assignment_text_from_gcs(assignment_id: str) -> str:
+    """Load PDF from GCS, parse, return assignment text for system prompt."""
+    title, questions = load_assignment_from_gcs(assignment_id)
+    return title + "\n\n" + "\n\n".join(
+        f"Question {q['id']}: {q['text']}" for q in questions
+    )
+
+
+@app.get("/export/{assignment_id}")
+async def export_assignment(assignment_id: str, answers: str = Query(..., alias="answers")):
+    """Generate PDF of questions and answers. Query param 'answers' = JSON array of {question_id, answer_text}."""
+    try:
+        answers_list = json.loads(answers)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid answers JSON")
+    try:
+        title, questions = load_assignment_from_gcs(assignment_id)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    pdf_bytes = build_export_pdf(title, questions, answers_list)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="claros-{assignment_id}.pdf"'},
+    )
 
 
 @app.post("/upload")
