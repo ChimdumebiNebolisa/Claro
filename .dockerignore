@@ -1,0 +1,12 @@
+.git
+.gitignore
+.env
+__pycache__
+*.pyc
+*.pyo
+docs/
+test_voice.html
+test_voice.py
+requirements-voice.txt
+*.md
+.DS_Store
