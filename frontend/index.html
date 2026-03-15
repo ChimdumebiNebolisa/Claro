@@ -6,49 +6,56 @@
   <title>Claros</title>
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: system-ui, sans-serif; background: #0f1419; color: #e2e4e8; min-height: 100vh; }
+    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #0f1419; color: #e2e4e8; min-height: 100vh; }
     .app { display: flex; height: 100vh; }
     .panel-left {
-      flex: 1; min-width: 0; overflow-y: auto; padding: 1rem; border-right: 1px solid #374151;
+      flex: 1; min-width: 0; overflow-y: auto; padding: 1.25rem 1.5rem; border-right: 1px solid #1e2530;
     }
     .panel-right {
-      width: 360px; flex-shrink: 0; padding: 1rem; display: flex; flex-direction: column;
+      width: 380px; flex-shrink: 0; padding: 1.25rem; display: flex; flex-direction: column; background: #0b0e12;
     }
-    .assignment-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: #f59e0b; }
+    .brand { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #f59e0b; margin-bottom: 0.25rem; }
+    .assignment-title { font-size: 1.15rem; font-weight: 600; margin-bottom: 1rem; color: #e2e4e8; }
     .upload-zone {
       border: 2px dashed #374151; border-radius: 8px; padding: 1.5rem; text-align: center; margin-bottom: 1rem;
       cursor: pointer; background: #1a1d23;
     }
     .upload-zone:hover { border-color: #f59e0b; }
     .upload-zone input { display: none; }
-    .upload-row { display: flex; gap: 0.75rem; align-items: stretch; margin-bottom: 1rem; }
+    .upload-row { display: flex; gap: 0.75rem; align-items: stretch; margin-bottom: 1.25rem; }
     .upload-row .upload-zone { flex: 1; margin-bottom: 0; }
     .btn-test-pdf { flex-shrink: 0; margin-top: 0; width: auto !important; min-width: unset; padding: 0.5rem 0.75rem; font-size: 0.875rem; white-space: nowrap; }
     .question-card {
-      background: #1a1d23; border: 1px solid #374151; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;
+      background: #1a1d23; border: 1px solid #252a33; border-radius: 10px; padding: 1.1rem; margin-bottom: 1rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
     .question-card.writing { border-color: #f59e0b; box-shadow: 0 0 0 2px rgba(245,158,11,0.3); }
-    .question-label { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem; color: #d1d5db; }
-    .question-text { font-size: 0.9rem; color: #9ca3af; margin-bottom: 0.75rem; white-space: pre-wrap; word-break: break-word; line-height: 1.4; }
+    .question-card.answer-ready { border-color: #22c55e; }
+    .question-label { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.4rem; color: #d1d5db; display: flex; align-items: center; gap: 0.5rem; }
+    .ready-badge { font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.45rem; border-radius: 4px; background: #14532d; color: #86efac; display: none; }
+    .question-card.answer-ready .ready-badge { display: inline-block; }
+    .question-text { font-size: 0.9rem; color: #9ca3af; margin-bottom: 0.75rem; white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
     .answer-field {
-      min-height: 60px; width: 100%; background: #111318; border: 1px solid #374151; border-radius: 4px;
-      padding: 0.75rem; font-family: ui-monospace, monospace; font-size: 0.9rem; color: #e2e4e8;
-      resize: vertical; white-space: pre-wrap; word-break: break-word;
+      min-height: 64px; width: 100%; background: #111318; border: 1px solid #252a33; border-radius: 6px;
+      padding: 0.75rem; font-family: system-ui, sans-serif; font-size: 0.9rem; color: #e2e4e8;
+      resize: vertical; white-space: pre-wrap; word-break: break-word; line-height: 1.5;
     }
+    .answer-field:empty::before { content: attr(data-placeholder); color: #4b5563; pointer-events: none; }
     .answer-field:focus { outline: none; border-color: #f59e0b; }
+    .panel-section-label { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #6b7280; margin-bottom: 0.5rem; }
     .status {
-      font-size: 1rem; font-weight: 600; text-align: center; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;
-      text-transform: uppercase; letter-spacing: 0.05em;
+      font-size: 1.05rem; font-weight: 700; text-align: center; padding: 0.85rem; border-radius: 8px; margin-bottom: 1rem;
+      text-transform: uppercase; letter-spacing: 0.06em;
     }
-    .status.idle { background: #374151; color: #9ca3af; }
+    .status.idle { background: #1a1d23; color: #6b7280; }
     .status.connecting { background: #1e3a5f; color: #93c5fd; }
     .status.teaching { background: #14532d; color: #86efac; }
     .status.writing { background: #422006; color: #fcd34d; }
-    .meter-wrap { height: 20px; background: #374151; border-radius: 4px; overflow: hidden; margin-bottom: 1rem; }
+    .meter-wrap { height: 18px; background: #1a1d23; border-radius: 4px; overflow: hidden; margin-bottom: 1rem; }
     .meter-bar { height: 100%; width: 0%; background: #22c55e; transition: width 0.05s ease; }
     .transcript {
-      flex: 1; min-height: 120px; overflow-y: auto; background: #111318; border: 1px solid #374151;
-      border-radius: 8px; padding: 0.75rem; font-size: 0.85rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+      flex: 1; min-height: 120px; overflow-y: auto; background: #111318; border: 1px solid #252a33;
+      border-radius: 8px; padding: 0.75rem; font-size: 0.85rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
     }
     .transcript .user { color: #93c5fd; }
     .transcript .claros { color: #86efac; }
@@ -60,21 +67,19 @@
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn.stop { background: #dc2626; color: #fff; }
     .btn.stop:hover { background: #ef4444; }
-    .btn.export { background: #374151; color: #e2e4e8; margin-top: 1rem; }
-    .btn.export:hover { background: #4b5563; }
+    .btn.export { background: #22c55e; color: #0f1419; margin-top: 1.25rem; font-size: 0.95rem; }
+    .btn.export:hover { background: #4ade80; }
     .btn.export { display: none; }
     .btn.export.visible { display: block; }
-    .btn-write-answer {
-      font-size: 0.8rem; padding: 0.35rem 0.6rem; margin-top: 0.35rem; width: auto;
-      background: #374151; color: #e2e4e8;
-    }
-    .btn-write-answer:hover { background: #4b5563; }
+    /* Hidden from user UI, kept for debug fallback */
+    .btn-write-answer { display: none !important; }
     .errors { font-size: 0.85rem; color: #fca5a5; margin-top: 0.5rem; min-height: 1.5rem; }
   </style>
 </head>
 <body>
   <div class="app">
     <div class="panel-left">
+      <div class="brand">Claros</div>
       <div class="assignment-title" id="assignmentTitle">Upload an assignment PDF</div>
       <div class="upload-row">
         <div class="upload-zone" id="uploadZone">
@@ -84,11 +89,13 @@
         <button type="button" class="btn btn-test-pdf" id="testPdfBtn">Use Test PDF</button>
       </div>
       <div id="questionsContainer"></div>
-      <button class="btn export" id="exportBtn">Export to PDF</button>
+      <button class="btn export" id="exportBtn">Export PDF</button>
     </div>
     <div class="panel-right">
+      <div class="panel-section-label">Session</div>
       <div id="status" class="status idle">Idle</div>
       <div class="meter-wrap"><div id="meterBar" class="meter-bar"></div></div>
+      <div class="panel-section-label">Conversation</div>
       <div id="transcript" class="transcript"></div>
       <div id="errors" class="errors"></div>
       <button class="btn" id="micBtn" disabled>Start Session</button>
@@ -181,21 +188,31 @@
           card.className = 'question-card';
           card.dataset.questionId = String(q.id);
           const questionText = (q.text != null && q.text !== '') ? String(q.text) : '';
-          card.innerHTML = '<div class="question-label">Question ' + q.id + '</div><div class="question-text"></div><div class="answer-field" data-question-id="' + q.id + '" contenteditable="true" spellcheck="true"></div>';
+          card.innerHTML = '<div class="question-label">Question ' + q.id + '<span class="ready-badge">Answer stated</span></div><div class="question-text"></div><div class="answer-field" data-question-id="' + q.id + '" data-placeholder="Answer will appear here..." contenteditable="true" spellcheck="true"></div>';
           const questionTextEl = card.querySelector('.question-text');
           const answerEl = card.querySelector('.answer-field');
           if (questionTextEl) {
             questionTextEl.textContent = questionText;
             console.log('[renderQuestions] Card for Q' + q.id + ': set question-text to', questionText ? questionText.substring(0, 50) + (questionText.length > 50 ? '...' : '') : '(empty)');
           }
-          answerEl.addEventListener('input', () => { state.answers[q.id] = answerEl.textContent; });
+          answerEl.addEventListener('input', () => {
+            state.answers[q.id] = answerEl.textContent;
+            if (answerEl.textContent.trim()) exportBtn.classList.add('visible');
+          });
+          // Hidden debug fallback button (CSS: display:none)
           const writeAnswerBtn = document.createElement('button');
           writeAnswerBtn.type = 'button';
           writeAnswerBtn.className = 'btn btn-write-answer';
           writeAnswerBtn.textContent = 'Write Answer';
           writeAnswerBtn.addEventListener('click', function () {
+            var wsState = ws ? ws.readyState : -1;
+            var payload = { type: 'manual_write', question_id: q.id };
+            console.log('[WriteAnswer] Button clicked for question_id=' + q.id + ', ws.readyState=' + wsState + ' (OPEN=' + WebSocket.OPEN + ')');
             if (ws && ws.readyState === WebSocket.OPEN) {
-              ws.send(JSON.stringify({ type: 'manual_write', question_id: q.id }));
+              console.log('[WriteAnswer] Sending payload:', JSON.stringify(payload));
+              ws.send(JSON.stringify(payload));
+            } else {
+              console.error('[WriteAnswer] CANNOT SEND: WebSocket not open. readyState=' + wsState);
             }
           });
           card.appendChild(writeAnswerBtn);
@@ -355,22 +372,38 @@
             else if (msg.type === 'transcript') addTranscript(msg.speaker || 'claros', msg.text || '');
             else if (msg.type === 'audio') queuePcm24kChunk(msg.data);
             else if (msg.type === 'write_start') {
+              console.log('[write_start] question_id=' + msg.question_id);
               const el = getAnswerEl(msg.question_id);
               const card = getCardEl(msg.question_id);
-              if (el) { el.textContent = ''; state.answers[msg.question_id] = ''; }
+              if (el) {
+                console.log('[write_start] Clearing answer field for question_id=' + msg.question_id);
+                el.textContent = ''; state.answers[msg.question_id] = '';
+              } else {
+                console.error('[write_start] getAnswerEl returned NULL for question_id=' + msg.question_id);
+              }
               if (card) card.classList.add('writing');
             }
             else if (msg.type === 'write_token') {
               const el = getAnswerEl(msg.question_id);
               if (el) {
+                var tokenLen = (msg.text || '').length;
                 el.textContent = (el.textContent || '') + (msg.text || '');
                 state.answers[msg.question_id] = el.textContent;
+                console.log('[write_token] question_id=' + msg.question_id + ' +' + tokenLen + ' chars, total=' + el.textContent.length);
                 exportBtn.classList.add('visible');
+              } else {
+                console.error('[write_token] getAnswerEl returned NULL for question_id=' + msg.question_id);
               }
             }
             else if (msg.type === 'write_end') {
+              console.log('[write_end] question_id=' + msg.question_id + ' COMPLETE');
               const card = getCardEl(msg.question_id);
               if (card) card.classList.remove('writing');
+            }
+            else if (msg.type === 'answer_ready') {
+              console.log('[answer_ready] question_id=' + msg.question_id);
+              const card = getCardEl(msg.question_id);
+              if (card) card.classList.add('answer-ready');
             }
             else if (msg.type === 'error') errorsEl.textContent = msg.message || '';
           } catch (err) { console.error(err); }

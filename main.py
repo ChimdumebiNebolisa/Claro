@@ -7,7 +7,6 @@ import json
 import os
 import re
 import tempfile
-import time
 import uuid
 from pathlib import Path
 
@@ -158,31 +157,52 @@ _QUESTION_NUM_RE = re.compile(r"question\s*(\d+)", re.IGNORECASE)
 
 
 def _detect_write_intent(text: str) -> tuple[bool, int | None]:
-    """Returns (has_intent, question_id or None). question_id defaults to 1 if intent but no number."""
+    """Returns (has_intent, question_id or None). question_id is None if no number mentioned."""
     has_intent = bool(text and _WRITE_INTENT_RE.search(text))
     m = _QUESTION_NUM_RE.search(text) if text else None
-    qid = int(m.group(1)) if m else (1 if has_intent else None)
+    qid = int(m.group(1)) if m else None
     print(f"[_detect_write_intent] input={text!r} -> has_intent={has_intent}, question_id={qid}")
     if not has_intent:
         return False, None
     return True, qid
 
 
-# Claros output phrases that indicate it is about to write or has confirmed writing (voice trigger from output_transcription).
+# Strict trigger: only fires when Claros says "let me write that for question N"
 _CLAROS_WRITE_PHRASE_RE = re.compile(
-    r"\b(I'll write that|writing that down|here is the answer|the answer is|let me write)\b",
+    r"let me write that for question\s*(\d+)",
     re.IGNORECASE,
 )
 
 
 def _detect_write_from_output(text: str) -> tuple[bool, int | None]:
-    """Returns (has_trigger, question_id or None). Used on Claros output_transcription to trigger write without turn_complete."""
-    if not text or not _CLAROS_WRITE_PHRASE_RE.search(text):
+    """Returns (has_trigger, question_id or None). Only triggers on the exact phrase with a question number."""
+    if not text:
+        print("[_detect_write_from_output] empty text -> no trigger")
         return False, None
-    m = _QUESTION_NUM_RE.search(text)
-    qid = int(m.group(1)) if m else 1
-    print(f"[_detect_write_from_output] output={text[:80]!r}... -> question_id={qid}")
+    m = _CLAROS_WRITE_PHRASE_RE.search(text)
+    if not m:
+        return False, None
+    qid = int(m.group(1))
+    print(f"[_detect_write_from_output] TRIGGERED on output={text[:120]!r} -> question_id={qid}")
     return True, qid
+
+
+# Detect when the student states their final answer for a question.
+_ANSWER_STATED_RE = re.compile(
+    r"(?:"
+    r"(?:my|the|final)\s+answer\s+is\b|"
+    r"i\s+think\s+(?:it'?s|it\s+is|the\s+answer\s+is)\b|"
+    r"(?:my|the)\s+final\s+answer\b|"
+    r"that'?s\s+my\s+answer\b|"
+    r"so\s+(?:it'?s|it\s+is|the\s+answer\s+is)\b"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def _detect_answer_stated(text: str) -> bool:
+    """Returns True if the utterance contains a phrase indicating the student is stating their answer."""
+    return bool(text and _ANSWER_STATED_RE.search(text))
 
 
 @app.websocket("/session/{assignment_id}")
@@ -219,21 +239,25 @@ async def ws_session(websocket: WebSocket, assignment_id: str):
     async def send_json(obj: dict):
         try:
             await websocket.send_text(json.dumps(obj))
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f"[send_json] FAILED to send {obj.get('type', '?')}: {type(exc).__name__}: {exc}")
 
-    # Conversation context for the text model when generating written answers.
     conversation_context: list[tuple[str, str]] = []
-    last_write_trigger_text: str | None = None  # debounce: avoid re-triggering on same utterance
-    user_transcript_buffer: str = ""  # accumulate input_transcription fragments until turn_complete
-    # Output-transcription trigger: watch Claros's words for write phrases (no turn_complete needed).
+    last_write_trigger_text: str | None = None
+    user_transcript_buffer: str = ""
     claros_output_buffer: str = ""
-    last_output_write_trigger_time: float = 0.0
-    OUTPUT_WRITE_DEBOUNCE_SEC = 5.0
+
+    # Per-question answer readiness gate
+    answer_ready: dict[int, bool] = {}
+    answer_candidate: dict[int, str] = {}
+    current_question: int | None = None
 
     async def generate_write_response(question_id: int, context_snapshot: list[tuple[str, str]]):
         """Call standard Gemini text API to generate answer for question_id; stream as write_token."""
+        print(f"[generate_write_response] ENTER question_id={question_id}")
+        print(f"[generate_write_response] question_id={question_id} in question_ids={question_ids}? {question_id in question_ids}")
         if question_id not in question_ids:
+            print(f"[generate_write_response] ABORT: question_id={question_id} not in question_ids")
             await send_json({"type": "error", "message": f"Unknown question id: {question_id}"})
             return
         try:
@@ -248,12 +272,16 @@ Assignment:
 Conversation so far:
 {conv_str}
 
-The student has asked to have their answer for Question {question_id} written down. Based on what was discussed, write only the answer text for Question {question_id}. Do not include the question number, labels, or preamble. Output only the answer content that should appear in the answer box."""
+The student has asked to have their answer for Question {question_id} written down.
+{f"The student stated their answer as: {chr(34)}{answer_candidate.get(question_id, '')}{chr(34)}" if answer_candidate.get(question_id) else ""}
+Based on what was discussed, write only the answer text for Question {question_id}. Do not include the question number, labels, or preamble. Output only the answer content that should appear in the answer box. Write the student's own answer, cleaned up for clarity. Do not invent a different answer."""
+            print(f"[generate_write_response] Sending write_start for question_id={question_id}")
             await send_json({"type": "status", "mode": "writing"})
             await send_json({"type": "write_start", "question_id": question_id})
+            chunk_count = 0
             try:
-                # Use a text model for structured output; stream token by token.
-                text_model = "gemini-2.0-flash"
+                text_model = os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-flash").strip()
+                print(f"[generate_write_response] Using text_model={text_model!r}")
                 stream = await client.aio.models.generate_content_stream(
                     model=text_model,
                     contents=prompt,
@@ -261,16 +289,24 @@ The student has asked to have their answer for Question {question_id} written do
                 async for chunk in stream:
                     text = getattr(chunk, "text", None)
                     if text:
+                        chunk_count += 1
+                        print(f"[generate_write_response] write_token #{chunk_count} question_id={question_id} len={len(text)}")
                         await send_json({"type": "write_token", "question_id": question_id, "text": text})
+                if chunk_count == 0:
+                    print(f"[generate_write_response] WARNING: stream yielded 0 text chunks for question_id={question_id}")
             except Exception as e:
+                print(f"[generate_write_response] EXCEPTION during stream: {type(e).__name__}: {e}")
                 await send_json({"type": "error", "message": str(e)})
             finally:
+                print(f"[generate_write_response] Sending write_end for question_id={question_id} (chunks sent: {chunk_count})")
                 await send_json({"type": "write_end", "question_id": question_id})
                 await send_json({"type": "status", "mode": "teaching"})
         except asyncio.CancelledError:
+            print(f"[generate_write_response] CANCELLED for question_id={question_id}")
             await send_json({"type": "write_end", "question_id": question_id})
             await send_json({"type": "status", "mode": "teaching"})
             raise
+        print(f"[generate_write_response] EXIT question_id={question_id}")
 
     audio_queue = asyncio.Queue()
     recv_task = None
@@ -325,9 +361,12 @@ The student has asked to have their answer for Question {question_id} written do
         except asyncio.CancelledError:
             raise
 
+    def _write_task_running() -> bool:
+        return write_task is not None and not write_task.done()
+
     async def receive_from_gemini_and_forward(session):
         nonlocal recv_task, last_write_trigger_text, write_task, user_transcript_buffer
-        nonlocal claros_output_buffer, last_output_write_trigger_time
+        nonlocal claros_output_buffer, current_question
         while True:
             try:
                 async for response in session.receive():
@@ -339,51 +378,93 @@ The student has asked to have their answer for Question {question_id} written do
                     print(f"[receive] turn_complete={turn_complete} model_turn={model_turn} input_trans={input_trans} output_trans={output_trans}")
                     if not sc:
                         continue
+
+                    # --- Input transcription accumulation ---
                     if sc.input_transcription and sc.input_transcription.text:
                         user_transcript_buffer += sc.input_transcription.text
+
+                    # --- Output transcription: Claros speaks ---
                     if sc.output_transcription and sc.output_transcription.text:
                         text = sc.output_transcription.text
                         conversation_context.append(("claros", text))
                         await send_json({"type": "transcript", "speaker": "claros", "text": text})
-                        # Voice trigger from Claros output: when Claros says it will write, trigger immediately.
                         claros_output_buffer += text
                         if len(claros_output_buffer) > 2000:
                             claros_output_buffer = claros_output_buffer[-1000:]
                         has_trigger, qid = _detect_write_from_output(claros_output_buffer)
-                        if has_trigger and qid is not None and (time.monotonic() - last_output_write_trigger_time) >= OUTPUT_WRITE_DEBOUNCE_SEC:
-                            last_output_write_trigger_time = time.monotonic()
-                            claros_output_buffer = ""
-                            if write_task is not None and not write_task.done():
-                                write_task.cancel()
-                            context_snapshot = list(conversation_context)
-                            write_task = asyncio.create_task(generate_write_response(qid, context_snapshot))
-                            print(f"[session] Output-transcription trigger: generate_write_response for question_id={qid}")
+                        if has_trigger and qid is not None:
+                            if not answer_ready.get(qid):
+                                print(f"[session] Output trigger BLOCKED: answer not yet stated for question_id={qid}")
+                            elif _write_task_running():
+                                print(f"[session] Output trigger SKIPPED: write_task already running for question_id={qid}")
+                            else:
+                                claros_output_buffer = ""
+                                context_snapshot = list(conversation_context)
+                                write_task = asyncio.create_task(generate_write_response(qid, context_snapshot))
+                                print(f"[session] Output-transcription trigger: launched generate_write_response for question_id={qid}")
+
+                    # --- Audio forwarding ---
                     if sc.model_turn and sc.model_turn.parts:
                         for part in sc.model_turn.parts:
                             if part.inline_data and part.inline_data.data:
                                 data = part.inline_data.data
-                                print(f"[session/{assignment_id}] receive_from_gemini_and_forward: received audio from Gemini ({len(data)} bytes), forwarding to browser")
                                 await send_json({"type": "audio", "data": base64.b64encode(data).decode()})
-                    if getattr(sc, "turn_complete", False):
+
+                    # --- Turn complete: process accumulated user utterance ---
+                    if turn_complete:
                         full_utterance = user_transcript_buffer.strip()
+                        print(f"[session] turn_complete: full_utterance={full_utterance!r}")
                         if full_utterance:
                             conversation_context.append(("user", full_utterance))
                             await send_json({"type": "transcript", "speaker": "user", "text": full_utterance})
+
+                            # Track which question is being discussed
+                            q_mention = _QUESTION_NUM_RE.search(full_utterance)
+                            if q_mention:
+                                current_question = int(q_mention.group(1))
+                                print(f"[session] current_question updated to {current_question}")
+
+                            # Detect if student is stating their answer
+                            if _detect_answer_stated(full_utterance):
+                                target_q = int(q_mention.group(1)) if q_mention else current_question
+                                if target_q is not None:
+                                    answer_ready[target_q] = True
+                                    answer_candidate[target_q] = full_utterance
+                                    print(f"[session] answer_ready[{target_q}] = True, candidate={full_utterance[:80]!r}")
+                                    await send_json({"type": "answer_ready", "question_id": target_q})
+                                else:
+                                    print(f"[session] Answer stated but no target question identified")
+
+                            # Check for write intent
                             has_intent, qid = _detect_write_intent(full_utterance)
-                            if has_intent and qid is not None and (last_write_trigger_text is None or last_write_trigger_text != full_utterance):
-                                print(f"[session] Calling generate_write_response for question_id={qid}")
-                                last_write_trigger_text = full_utterance
-                                if write_task is not None and not write_task.done():
-                                    write_task.cancel()
-                                context_snapshot = list(conversation_context)
-                                write_task = asyncio.create_task(generate_write_response(qid, context_snapshot))
+                            if has_intent and qid is None:
+                                qid = current_question or 1
+                                print(f"[session] No question in write intent, defaulting to qid={qid}")
+                            print(f"[session] _detect_write_intent -> has_intent={has_intent}, question_id={qid}")
+                            if has_intent and qid is not None:
+                                if not answer_ready.get(qid):
+                                    print(f"[session] WRITE BLOCKED: answer not yet stated for question_id={qid}")
+                                    await send_json({
+                                        "type": "transcript", "speaker": "claros",
+                                        "text": "Tell me your final answer first, then I can write it into the worksheet."
+                                    })
+                                elif _write_task_running():
+                                    print(f"[session] User intent trigger SKIPPED: write_task already running for question_id={qid}")
+                                elif last_write_trigger_text == full_utterance:
+                                    print(f"[session] User intent trigger SKIPPED: duplicate utterance")
+                                else:
+                                    last_write_trigger_text = full_utterance
+                                    context_snapshot = list(conversation_context)
+                                    write_task = asyncio.create_task(generate_write_response(qid, context_snapshot))
+                                    print(f"[session] User intent trigger: launched generate_write_response for question_id={qid}")
                         user_transcript_buffer = ""
                         await send_json({"type": "status", "mode": "teaching"})
-                        last_write_trigger_text = None  # allow next utterance to trigger again
+                        last_write_trigger_text = None
                 await asyncio.sleep(1)
             except asyncio.CancelledError:
                 raise
             except Exception as e:
+                print(f"[receive] EXCEPTION: {type(e).__name__}: {e}")
                 await send_json({"type": "error", "message": str(e)})
                 await asyncio.sleep(1)
 
@@ -401,19 +482,22 @@ The student has asked to have their answer for Question {question_id} written do
                     continue
                 if msg.get("type") == "websocket.disconnect":
                     break
-                # Manual write trigger: button click sends {type: 'manual_write', question_id: N}.
                 if "text" in msg:
                     try:
                         data = json.loads(msg["text"])
+                        print(f"[session] Received text message: {data}")
                         if data.get("type") == "manual_write":
                             qid = int(data.get("question_id", 1))
+                            print(f"[session] manual_write received: question_id={qid}")
+                            print(f"[session] manual_write: question_id={qid} in question_ids={question_ids}? {qid in question_ids}")
                             if write_task is not None and not write_task.done():
+                                print(f"[session] manual_write: cancelling existing write_task before starting new one")
                                 write_task.cancel()
                             context_snapshot = list(conversation_context)
+                            print(f"[session] manual_write: calling generate_write_response(question_id={qid}, context_len={len(context_snapshot)})")
                             write_task = asyncio.create_task(generate_write_response(qid, context_snapshot))
-                            print(f"[session] Manual write trigger: generate_write_response for question_id={qid}")
-                    except (json.JSONDecodeError, ValueError, KeyError):
-                        pass
+                    except (json.JSONDecodeError, ValueError, KeyError) as exc:
+                        print(f"[session] Failed to parse text message: {type(exc).__name__}: {exc}")
                 # Only enqueue when binary audio payload is present (avoids KeyError).
                 if "bytes" in msg:
                     chunk = msg["bytes"]
