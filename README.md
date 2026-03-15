@@ -2,7 +2,7 @@
 
 **A voice-first AI agent for students with typing difficulties that supports guided reasoning on structured worksheets and writes answers only after the student has stated them.**
 
----
+![Claros interface screenshot](images/image.png)
 
 ## Overview
 
@@ -11,6 +11,10 @@ Claros is a voice-driven study agent that reads assignment PDFs, parses individu
 The core interaction is voice-first: the student speaks, Claros responds through audio, and the answer is written into the worksheet only when the student is ready. This makes Claros particularly useful for students with typing difficulties who struggle with the manual entry step of structured assignments, while still preserving the learning process.
 
 Claros is not an answer bot. It does not generate or fill in answers on its own. It writes only after the student has already stated or clearly confirmed the answer.
+
+## Demo Video
+
+Demo video: [Add link here]
 
 ## Problem
 
