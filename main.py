@@ -148,7 +148,15 @@ async def stream_write(assignment_id: str, body: WriteRequest):
     qids = [q["id"] for q in questions]
     if body.question_id not in qids:
         raise HTTPException(status_code=400, detail=f"Unknown question id: {body.question_id}")
-    if not (body.answer_candidate and body.answer_candidate.strip()):
+    candidate = body.answer_candidate or ""
+    candidate_empty = not bool(candidate.strip())
+    print(
+        "[write] Incoming request.",
+        "question_id=", body.question_id,
+        "candidate_empty=", candidate_empty,
+        "candidate_preview=", repr(candidate[:120]),
+    )
+    if candidate_empty:
         raise HTTPException(status_code=400, detail="Student must state the answer before writing is allowed.")
     conv_str = "\n".join(
         f"{'User' if c.get('speaker') == 'user' else 'Claros'}: {c.get('text', '')}"

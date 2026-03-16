@@ -510,7 +510,15 @@
       }
 
       function triggerWrite(questionId) {
-        if (writeInProgress) return;
+        console.log('[write] triggerWrite called.', {
+          questionId: questionId,
+          writeInProgress: writeInProgress,
+          answerCandidatePreview: (answerCandidate[questionId] || '').slice(0, 120)
+        });
+        if (writeInProgress) {
+          console.log('[write] Aborting triggerWrite because writeInProgress is true.');
+          return;
+        }
         var el = getAnswerEl(questionId);
         var card = getCardEl(questionId);
         if (!el) return;
@@ -520,6 +528,11 @@
         state.answers[questionId] = '';
         if (card) card.classList.add('writing');
         var url = API_BASE + '/api/write/' + state.assignmentId;
+        console.log('[write] Sending /api/write request.', {
+          url: url,
+          questionId: questionId,
+          answerCandidatePreview: (answerCandidate[questionId] || '').slice(0, 120)
+        });
         var body = JSON.stringify({
           question_id: questionId,
           conversation: conversationContext,
@@ -699,7 +712,10 @@
                   setStatus('listening');
                   if (full) {
                     var norm = normalizeTranscript(full);
-                    console.log('[transcript] Final turn.', { raw: full, normalized: norm });
+                    console.log('[transcript] Final turn.', {
+                      raw: full,
+                      normalized: norm
+                    });
                     conversationContext.push({ speaker: 'user', text: full });
                     addTranscript('user', full);
                     var qm = QUESTION_NUM_RE.exec(norm);
@@ -709,16 +725,41 @@
                       if (tq != null) {
                         answerReady[tq] = true;
                         answerCandidate[tq] = full;
-                        var card = getCardEl(tq);
-                        if (card) card.classList.add('answer-ready');
+                        var cardT = getCardEl(tq);
+                        if (cardT) cardT.classList.add('answer-ready');
                       }
                     }
                     var hasIntent = WRITE_INTENT_RE.test(norm);
                     var qid = qm ? parseInt(qm[1], 10) : (currentQuestion || 1);
-                    console.log('[intent] Write intent + question.', { hasWriteIntent: hasIntent, questionId: qid });
+                    var readyBefore = !!answerReady[qid];
+                    var candidateBefore = answerCandidate[qid] || '';
+                    var usedFallback = false;
+                    if (hasIntent && !answerReady[qid] && ANSWER_STATED_RE.test(norm)) {
+                      usedFallback = true;
+                      answerReady[qid] = true;
+                      answerCandidate[qid] = full;
+                      console.log('[intent] Fallback applied for write.', {
+                        qid: qid,
+                        answerCandidatePreview: full.slice(0, 120)
+                      });
+                    }
+                    console.log('[intent] Write decision.', {
+                      raw: full,
+                      normalized: norm,
+                      qid: qid,
+                      hasWriteIntent: hasIntent,
+                      answerReadyBeforeFallback: readyBefore,
+                      answerCandidateBeforeFallback: candidateBefore.slice(0, 120),
+                      usedFallback: usedFallback,
+                      answerReadyAfterFallback: !!answerReady[qid],
+                      finalAnswerCandidatePreview: (answerCandidate[qid] || '').slice(0, 120),
+                      writeInProgress: writeInProgress
+                    });
                     if (hasIntent && answerReady[qid] && !writeInProgress) {
-                      console.log('[intent] Triggering write for question.', { questionId: qid });
+                      console.log('[intent] Calling triggerWrite for question.', { qid: qid });
                       triggerWrite(qid);
+                    } else if (hasIntent && !answerReady[qid]) {
+                      console.log('[intent] Not writing because answerReady is false after fallback.', { qid: qid });
                     }
                     if (hasExportIntent(norm)) {
                       console.log('[intent] Export intent matched.', { normalized: norm });
