@@ -20,8 +20,8 @@ Claros closes this gap. It operates directly on the worksheet: guiding the stude
 2. **Start a voice session** — Claros connects to a real-time audio session. The student speaks through their microphone and hears Claros respond naturally.
 3. **Discuss a question** — Claros guides the student through the problem using Socratic questioning. It does not give the answer directly. Guided reasoning first, not answer generation.
 4. **State the final answer** — The student says their answer out loud (e.g., "I think the answer is 42" or "My answer for question 1 is the Civil War").
-5. **Ask Claros to write it** — The student says something like "Write my answer for question 1." Claros confirms, then writes the student's own answer into the correct field on the worksheet.
-6. **Export as PDF** — Once finished, the student exports all questions and answers as a formatted PDF.
+5. **Ask Claros to write it** — The student says something like "Write my answer for question 1," or Claros may offer ("Let me write that for question 1") after the student has worked through the answer. Claros then writes the answer into the correct field on the worksheet.
+6. **Export as PDF** — The Export PDF button appears once an assignment is loaded. The student can export at any time; the PDF includes all questions and answers (or "(No answer)" where none was written).
 
 ## Core Product Rule
 
@@ -29,7 +29,7 @@ Claros enforces a deliberate constraint: **it will not write an answer until the
 
 - If the student asks Claros to write before they have given their answer, Claros responds: *"Tell me your final answer first, then I can write it into the worksheet."*
 - This rule is enforced per question. Stating an answer for question 1 does not unlock writing for question 2.
-- The answer readiness gate is enforced in the system prompt (Claros is instructed to refuse), the frontend (the write action is only triggered when the student has stated their answer for that question), and the backend (the write API returns 400 if `answer_candidate` is missing or empty).
+- Answer readiness is set when the student states their answer (e.g. "my answer is 5") or when Claros offers to write after discussion (e.g. "Let me write that for question 1"). The frontend triggers the write only when readiness is set for that question. The backend generates the written answer from the conversation and optional answer candidate; it no longer requires a non-empty candidate.
 
 This is an intentional product decision. Claros is designed to support learning, not to bypass it. The voice interface removes the typing barrier; the readiness gate preserves the reasoning requirement.
 
@@ -45,12 +45,12 @@ This is not about making assignments easier. It is about making them accessible 
 - **Real-time voice conversation** — Bidirectional audio through Gemini Live. The student speaks and hears Claros respond with natural voice.
 - **Socratic guidance** — Claros defaults to teaching mode, asking guiding questions rather than stating answers.
 - **Per-question answer readiness tracking** — The frontend tracks whether the student has stated a final answer for each question before allowing a write.
-- **Controlled answer writing** — When permitted, the frontend calls the backend write API; the answer is streamed into the correct question field via Gemini text generation.
+- **Controlled answer writing** — When permitted, the frontend calls the backend write API; the answer is streamed into the correct question field via Gemini text generation. LaTeX-style `$...$` delimiters in model output are stripped so answers display as plain text (e.g. "x = 5" instead of "$x = 5$").
 - **Live transcript** — Both sides of the conversation are transcribed and displayed in real time (from Gemini Live in the browser).
-- **PDF export** — Export all questions and current answers as a formatted PDF document.
-- **Answer-stated indicator** — The UI shows a visual badge when the student has stated their answer for a given question.
- - **Barge-in / interruption** — If the student starts speaking while Claros is talking, Claros’ audio playback is stopped and the app returns to listening (frontend-level interruption, not full-duplex).
- - **Voice-enabled PDF export** — Saying phrases like “export pdf” or “export this as pdf” from within the voice session can trigger the same PDF export flow as the button.
+- **PDF export** — The Export PDF button is shown as soon as an assignment is loaded. Export includes all questions and answers (or "(No answer)" where empty); voice phrases like "export pdf" trigger the same flow.
+- **Answer-stated indicator** — The UI shows a visual badge when the student (or Claros) has indicated the answer for a given question.
+- **Barge-in / interruption** — If the student starts speaking while Claros is talking, Claros’ audio playback is stopped and the app returns to listening. An **Interrupt** button (visible during a session) stops Claros's speech immediately so the student can talk without speaking first.
+- **Voice-enabled PDF export** — Saying phrases like “export pdf” or “export this as pdf” from within the voice session triggers the same PDF export as the button; export is allowed even when no answers have been written yet.
 
 ## Architecture
 
@@ -73,13 +73,13 @@ FastAPI backend (main.py)
 
 **Real-time voice** uses **Gemini Live directly from the browser**. The backend does not proxy audio. On "Start Session", the frontend loads the Gemini SDK from the app’s own asset (`/genai.bundle.js`, built from `@google/genai` and checked in), fetches an ephemeral token and session config from `GET /api/session-config/{assignment_id}`, then connects to Gemini Live. The browser captures mic at 16 kHz PCM, sends audio to Gemini, and plays back responses. Transcripts are handled in the client; write detection (e.g. "write my answer for question N") and answer-stated detection run in the frontend.
 
-**Answer writing** is triggered when the user (or Claros) asks to write and the student has already stated their answer for that question. The frontend calls `POST /api/write/{assignment_id}` with conversation context and receives a streaming text response, which is appended into the correct question field.
+**Answer writing** is triggered when the user or Claros asks to write and the answer is marked ready for that question (e.g. student stated it or Claros said "Let me write that for question N"). The frontend calls `POST /api/write/{assignment_id}` with conversation context and optional answer candidate; the backend streams plain text into the correct question field. LaTeX `$...$` in the stream is stripped so the UI and export show plain text only.
 
-**Barge-in / interruption** is implemented entirely in the frontend audio playback layer. When new user mic transcription arrives from Gemini Live while Claros audio is playing, the browser stops any scheduled audio buffers, clears the local playback queue, and returns the UI to a listening state. This interrupts current playback; it does not provide overlapping, full-duplex conversation.
+**Barge-in / interruption** is implemented in the frontend. When the user starts speaking (or clicks the **Interrupt** button) while Claros is playing, the browser stops scheduled audio buffers, clears the playback queue, and returns to listening. This is not full-duplex.
 
-**Voice-enabled PDF export** is detected on the user speech path in the browser. When a user utterance for a completed turn clearly matches export-intent phrases (e.g., “export pdf”, “export as pdf”, “export this as pdf”, “download pdf”, “download the pdf”, “save as pdf”, “save this as pdf”, “save it as pdf”), the frontend triggers the same `/export/{assignment_id}` route used by the Export button, as long as at least one answer is non-empty. If no answers are present, the voice export request is blocked with a clear on-screen message instead of calling the backend. Voice export depends on the quality of the transcript; background noise or unusual phrasing may prevent detection.
+**Voice-enabled PDF export** is detected on the user speech path in the browser. When a user utterance for a completed turn clearly matches export-intent phrases (e.g., “export pdf”, “export as pdf”, “export this as pdf”, “download pdf”, “download the pdf”, “save as pdf”, “save this as pdf”, “save it as pdf”), the frontend triggers the same `/export/{assignment_id}` route as the Export button. Export is allowed with or without answers; the PDF lists all questions and shows "(No answer)" where none was written.
 
-**Answer readiness gating** is enforced in the frontend (UI and write flow only allow writing once the student has stated their answer, detected via phrase patterns) and in the backend (the write endpoint returns 400 if `answer_candidate` is missing or empty).
+**Answer readiness gating** is enforced in the frontend: writing is only triggered once the answer is marked ready for that question (student stated it or Claros said "Let me write that for question N"). The backend accepts the request with or without an answer candidate and uses the conversation to generate the written answer.
 
 **PDF pipeline**: Uploaded PDFs are stored in Google Cloud Storage, parsed with PyMuPDF to extract questions matching a `Question N:` pattern, and can be exported back as formatted PDFs with answers using ReportLab.
 
@@ -191,11 +191,11 @@ Local development may also require Google Cloud application credentials for GCS 
 - **Heuristic answer detection** — Answer readiness is determined in the frontend by matching common phrasing patterns (e.g., "my answer is…", "I think it's…"). Unusual phrasings may not be detected.
 - **Single-session state** — Conversation and answer readiness are held in memory in the browser. Refreshing the page starts a new session.
 - **PDF format dependency** — Question extraction relies on "Question N:" line patterns. PDFs with different formatting may fall back to single-block extraction.
-- **Voice model compliance** — The system prompt instructs Claros to follow specific rules, but LLM compliance is not guaranteed. The product rule (write only after answer stated) is enforced in the frontend and backend (write API requires non-empty answer_candidate).
+- **Voice model compliance** — The system prompt instructs Claros to follow specific rules, but LLM compliance is not guaranteed. The product rule (write only after answer stated or offered by Claros) is enforced in the frontend; the backend uses the conversation to produce the written answer.
 - **Direct Gemini Live** — Voice runs browser → Gemini Live. The frontend loads the `@google/genai` SDK from the app’s own asset (`/genai.bundle.js`); no runtime CDN. The bundle must be built once with `npm run build:genai` and committed.
 - **Ephemeral tokens** — Session config uses the Gemini API to create short-lived tokens. If token creation fails (e.g. API or region limitation), the backend returns 500 and the user must retry or check logs.
-- **Basic barge-in** — When the user starts speaking while Claros is talking, frontend playback is stopped, the local audio queue is cleared, and the app returns to listening. This improves perceived responsiveness but is still not full-duplex.
-- **Heuristic voice export intent** — Voice-triggered export is based on normalized phrase matching (e.g., “export pdf”, “export as pdf”, “download pdf”, “save as pdf”). It only fires when at least one answer is present and may not catch all phrasing variations; it also depends on transcript quality in noisy environments.
+- **Basic barge-in** — When the user starts speaking (or clicks Interrupt) while Claros is talking, frontend playback is stopped and the app returns to listening. This is not full-duplex.
+- **Heuristic voice export intent** — Voice-triggered export uses phrase matching (e.g., “export pdf”, “export as pdf”, “download pdf”, “save as pdf”). Transcript quality in noisy environments may affect detection.
 - **Browser audio processing** — The browser is asked (via getUserMedia constraints) to enable echo cancellation, noise suppression, automatic gain control, and mono capture. Actual behavior depends on the user’s device and browser support.
 - **Browser compatibility** — Requires a modern browser with WebSocket, AudioContext, and getUserMedia. Tested primarily on Chrome.
 

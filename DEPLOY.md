@@ -30,7 +30,7 @@ gcloud run deploy claros \
   --platform managed \
   --region ${REGION} \
   --allow-unauthenticated \
-  --set-env-vars "GEMINI_API_KEY=your-key,GCS_BUCKET_NAME=your-bucket,GOOGLE_CLOUD_PROJECT=${PROJECT_ID}" \
+  --set-env-vars "GEMINI_API_KEY=your-key,GCS_BUCKET_NAME=your-bucket,GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GEMINI_TEXT_MODEL=gemini-2.5-flash" \
   --min-instances 1 \
   --timeout 3600
 ```
@@ -38,6 +38,8 @@ gcloud run deploy claros \
 - **min-instances=1** avoids cold starts during demo.
 - **timeout=3600** keeps WebSocket connections alive (Cloud Run default is 60s).
 - Create a GCS bucket and grant the Cloud Run service account Storage Object Admin (or equivalent) on that bucket.
+
+**Environment variables:** `GEMINI_API_KEY` and `GCS_BUCKET_NAME` are required; `GOOGLE_CLOUD_PROJECT` is required for GCS. `GEMINI_TEXT_MODEL` (default `gemini-2.5-flash`) is optional and used for answer-writing.
 
 ## Frontend
 
