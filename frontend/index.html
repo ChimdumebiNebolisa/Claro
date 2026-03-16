@@ -6,11 +6,13 @@
   <title>Claros</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-text-size-adjust: 100%; }
     body {
       font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
       background: #0f1117; color: #e8eaed; min-height: 100vh;
+      overflow-x: hidden;
     }
-    .app { display: flex; height: 100vh; }
+    .app { display: flex; height: 100vh; min-height: 100vh; }
 
     /* ── Left panel: worksheet ── */
     .panel-left {
@@ -127,10 +129,11 @@
 
     /* Transcript */
     .transcript {
-      flex: 1; min-height: 120px; overflow-y: auto;
+      flex: 1; min-height: 120px; overflow-y: auto; overflow-x: hidden;
       background: #0f1117; border: 1px solid #1e2530;
       border-radius: 10px; padding: 0.7rem 0.8rem;
       font-size: 0.82rem; line-height: 1.6;
+      word-wrap: break-word; overflow-wrap: break-word;
     }
     .msg { padding: 0.25rem 0; word-break: break-word; }
     .msg + .msg { margin-top: 0.1rem; }
@@ -159,6 +162,69 @@
     .btn.export:hover { background: #4ade80; }
     .btn.export { display: none; }
     .btn.export.visible { display: block; }
+
+    /* ── Mobile responsive ── */
+    @media (max-width: 900px) {
+      .app {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+      }
+      .panel-left {
+        flex: none;
+        min-height: 0;
+        padding: 1rem 1rem 1.25rem;
+        border-right: none;
+        border-bottom: 1px solid #1e2530;
+      }
+      .panel-right {
+        width: 100%;
+        flex: 1;
+        min-height: 280px;
+        padding: 1rem;
+      }
+      .header { margin-bottom: 1rem; }
+      .brand { font-size: 1.1rem; }
+      .assignment-title { font-size: 1rem; margin-bottom: 0.75rem; }
+      .upload-row {
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }
+      .btn-test-pdf { width: 100%; }
+      .question-card { padding: 1rem; margin-bottom: 0.75rem; }
+      .answer-field { min-height: 48px; padding: 0.6rem 0.75rem; font-size: 16px; }
+      .transcript { min-height: 100px; }
+      .btn { padding: 0.85rem 1rem; min-height: 48px; font-size: 1rem; }
+    }
+
+    @media (max-width: 480px) {
+      .panel-left { padding: 0.75rem 0.875rem 1rem; }
+      .panel-right { padding: 0.75rem 0.875rem; min-height: 240px; }
+      .brand { font-size: 1rem; }
+      .brand-sub { font-size: 0.72rem; }
+      .assignment-title { font-size: 0.95rem; }
+      .upload-zone { padding: 1rem; }
+      .upload-zone span { font-size: 0.8rem; }
+      .question-label { font-size: 0.8rem; }
+      .question-text { font-size: 0.82rem; }
+      .section-label { font-size: 0.58rem; }
+      .status-bar { font-size: 0.78rem; padding: 0.5rem; }
+      .transcript { font-size: 0.78rem; padding: 0.6rem 0.7rem; }
+      .errors { font-size: 0.78rem; }
+    }
+
+    /* Prevent zoom on input focus on iOS */
+    @media (max-width: 480px) {
+      .answer-field { font-size: 16px !important; }
+    }
+
+    /* Safe area for notched devices */
+    @supports (padding: env(safe-area-inset-bottom)) {
+      .panel-left { padding-left: max(1rem, env(safe-area-inset-left)); padding-right: max(1rem, env(safe-area-inset-right)); }
+      .panel-right { padding-left: max(1rem, env(safe-area-inset-left)); padding-right: max(1rem, env(safe-area-inset-right)); padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+      .btn { margin-bottom: env(safe-area-inset-bottom); }
+    }
   </style>
 </head>
 <body>
