@@ -361,6 +361,9 @@
           });
           questionsContainer.appendChild(card);
         });
+        if (state.questions && state.questions.length > 0) {
+          exportBtn.classList.add('visible');
+        }
         console.log('[renderQuestions] Created', state.questions?.length || 0, 'card(s). DOM children:', questionsContainer.children.length);
       }
 
@@ -542,17 +545,10 @@
 
       function performExport(opts) {
         if (!state.assignmentId) return false;
-        var answers = Object.entries(state.answers).map(function (entry) {
-          return { question_id: parseInt(entry[0], 10), answer_text: entry[1] || '' };
+        var answers = state.questions.map(function (q) {
+          return { question_id: q.id, answer_text: state.answers[q.id] || '' };
         });
-        var hasAnyAnswer = answers.some(function (a) { return a.answer_text && a.answer_text.trim(); });
         var source = (opts && opts.source) || 'manual';
-        if (!hasAnyAnswer) {
-          var msg = 'Cannot export: no answers yet. Speak or type at least one answer before exporting.';
-          errorsEl.textContent = msg;
-          console.log('[voice-export] Blocked export: no answers yet.', { source: source });
-          return false;
-        }
         var q = 'answers=' + encodeURIComponent(JSON.stringify(answers));
         var href = '/export/' + state.assignmentId + '?' + q;
         console.log('[voice-export] Triggering PDF export.', { source: source, href: href });
