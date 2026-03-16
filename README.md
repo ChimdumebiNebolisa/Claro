@@ -77,7 +77,7 @@ FastAPI backend (main.py)
 
 **Barge-in / interruption** is implemented entirely in the frontend audio playback layer. When new user mic transcription arrives from Gemini Live while Claros audio is playing, the browser stops any scheduled audio buffers, clears the local playback queue, and returns the UI to a listening state. This interrupts current playback; it does not provide overlapping, full-duplex conversation.
 
-**Voice-enabled PDF export** is detected on the user speech path in the browser. When a user utterance for a completed turn clearly matches export-intent phrases (e.g., “export pdf”, “export this as pdf”, “download pdf”, “save this as pdf”), the frontend triggers the same `/export/{assignment_id}` route used by the Export button, as long as at least one answer is non-empty. If no answers are present, the voice export request is blocked with a clear on-screen message instead of calling the backend.
+**Voice-enabled PDF export** is detected on the user speech path in the browser. When a user utterance for a completed turn clearly matches export-intent phrases (e.g., “export pdf”, “export as pdf”, “export this as pdf”, “download pdf”, “download the pdf”, “save as pdf”, “save this as pdf”, “save it as pdf”), the frontend triggers the same `/export/{assignment_id}` route used by the Export button, as long as at least one answer is non-empty. If no answers are present, the voice export request is blocked with a clear on-screen message instead of calling the backend. Voice export depends on the quality of the transcript; background noise or unusual phrasing may prevent detection.
 
 **Answer readiness gating** is enforced in the frontend (UI and write flow only allow writing once the student has stated their answer, detected via phrase patterns) and in the backend (the write endpoint returns 400 if `answer_candidate` is missing or empty).
 
@@ -195,7 +195,8 @@ Local development may also require Google Cloud application credentials for GCS 
 - **Direct Gemini Live** — Voice runs browser → Gemini Live. The frontend loads the `@google/genai` SDK from the app’s own asset (`/genai.bundle.js`); no runtime CDN. The bundle must be built once with `npm run build:genai` and committed.
 - **Ephemeral tokens** — Session config uses the Gemini API to create short-lived tokens. If token creation fails (e.g. API or region limitation), the backend returns 500 and the user must retry or check logs.
 - **Basic barge-in** — When the user starts speaking while Claros is talking, frontend playback is stopped, the local audio queue is cleared, and the app returns to listening. This improves perceived responsiveness but is still not full-duplex.
-- **Heuristic voice export intent** — Voice-triggered export is based on simple phrase matching (e.g., “export pdf”). It only fires when at least one answer is present and may not catch all phrasing variations.
+- **Heuristic voice export intent** — Voice-triggered export is based on normalized phrase matching (e.g., “export pdf”, “export as pdf”, “download pdf”, “save as pdf”). It only fires when at least one answer is present and may not catch all phrasing variations; it also depends on transcript quality in noisy environments.
+- **Browser audio processing** — The browser is asked (via getUserMedia constraints) to enable echo cancellation, noise suppression, automatic gain control, and mono capture. Actual behavior depends on the user’s device and browser support.
 - **Browser compatibility** — Requires a modern browser with WebSocket, AudioContext, and getUserMedia. Tested primarily on Chrome.
 
 ## Future Improvements

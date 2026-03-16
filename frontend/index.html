@@ -321,21 +321,42 @@
       let currentQuestion = null;
       let clarosOutputBuffer = '';
       let userTranscriptBuffer = '';
-      let lastExportVoiceText = '';
+      let lastExportVoiceNorm = '';
       let writeInProgress = false;
       let keepaliveInterval = null;
 
-      var WRITE_INTENT_RE = /\b(write|put\s+that\s+down|answer\s+question|write\s+my\s+answer|write\s+it\s+down|write\s+that)\b/i;
-      var QUESTION_NUM_RE = /question\s*(\d+)/i;
-      var CLAROS_WRITE_PHRASE_RE = /let me write that for question\s*(\d+)/i;
-      var ANSWER_STATED_RE = /(?:my|the|final)\s+answer\s+is\b|i\s+think\s+(?:it'?s|it\s+is|the\s+answer\s+is)\b|(?:my|the)\s+final\s+answer\b|that'?s\s+my\s+answer\b|so\s+(?:it'?s|it\s+is|the\s+answer\s+is)\b/i;
-      var EXPORT_INTENT_RE = /(?:\bexport(?:\s+this|\s+it)?\s+as\s+pdf\b|\bexport\s+pdf\b|\bdownload\s+pdf\b|\bsave\s+(?:this|it)\s+as\s+pdf\b)/i;
+      var WRITE_INTENT_RE = /\b(write|put\s+that\s+down|answer\s+question|write\s+my\s+answer|write\s+it\s+down|write\s+that)\b/;
+      var QUESTION_NUM_RE = /question\s*(\d+)/;
+      var CLAROS_WRITE_PHRASE_RE = /let me write that for question\s*(\d+)/;
+      var ANSWER_STATED_RE = /(?:my|the|final)\s+answer\s+is\b|i\s+think\s+(?:its|it\s+is|the\s+answer\s+is)\b|(?:my|the)\s+final\s+answer\b|thats\s+my\s+answer\b|so\s+(?:its|it\s+is|the\s+answer\s+is)\b/;
 
       function int16ArrayToBase64(int16Arr) {
         var bytes = new Uint8Array(int16Arr.buffer);
         var binary = '';
         for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
         return btoa(binary);
+      }
+
+      function normalizeTranscript(text) {
+        if (!text) return '';
+        var s = String(text)
+          .toLowerCase()
+          .trim()
+          .replace(/[.,!?;:"]/g, ' ')
+          .replace(/\s+/g, ' ');
+        return s;
+      }
+
+      function hasExportIntent(norm) {
+        if (!norm) return false;
+        return norm.indexOf('export pdf') !== -1 ||
+          norm.indexOf('export as pdf') !== -1 ||
+          norm.indexOf('export this as pdf') !== -1 ||
+          norm.indexOf('download pdf') !== -1 ||
+          norm.indexOf('download the pdf') !== -1 ||
+          norm.indexOf('save as pdf') !== -1 ||
+          norm.indexOf('save this as pdf') !== -1 ||
+          norm.indexOf('save it as pdf') !== -1;
       }
 
       /* ── Status ── */
@@ -441,7 +462,7 @@
       function clearPlayback() {
         var count = scheduledSources.length;
         if (count > 0 || nextPlaybackTime > 0) {
-          console.log('[barge-in] Stopping playback. Active sources:', count, 'nextPlaybackTime:', nextPlaybackTime);
+          console.log('[barge-in] Playback stopping. Active sources:', count, 'nextPlaybackTime:', nextPlaybackTime);
         }
         for (var i = 0; i < scheduledSources.length; i++) {
           try { scheduledSources[i].stop(); } catch (_) {}
@@ -474,17 +495,17 @@
         return true;
       }
 
-      function triggerVoiceExport(full) {
-        if (!EXPORT_INTENT_RE.test(full)) return;
+      function triggerVoiceExport(raw, norm) {
+        if (!hasExportIntent(norm)) return;
         if (!state.assignmentId) return;
-        if (full === lastExportVoiceText) {
-          console.log('[voice-export] Skipping duplicate export phrase for same utterance.');
+        if (norm === lastExportVoiceNorm) {
+          console.log('[voice-export] Skipping duplicate export phrase for same normalized utterance.');
           return;
         }
-        console.log('[voice-export] Voice export intent detected from transcript:', full);
+        console.log('[voice-export] Voice export intent detected.', { raw: raw, normalized: norm });
         var ok = performExport({ source: 'voice' });
         if (ok) {
-          lastExportVoiceText = full;
+          lastExportVoiceNorm = norm;
         }
       }
 
@@ -616,8 +637,16 @@
               responseModalities: ['AUDIO'],
               speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } } },
               systemInstruction: { parts: [{ text: config.system_prompt || '' }] },
-              inputAudioTranscription: {},
-              outputAudioTranscription: {}
+              inputAudioTranscription: {
+                // Prefer activity-based turns to reduce false positives from background noise,
+                // while still allowing responsive interruption.
+                mode: 'ACTIVITY',
+                interimResults: true
+              },
+              outputAudioTranscription: {
+                // Keep Claros' spoken turns well-bounded.
+                mode: 'TURN_BASED'
+              }
             },
             callbacks: {
               onmessage: function (msg) {
@@ -634,7 +663,7 @@
                   activeClarosMsg = null;
                   if (wasSpeaking) {
                     setStatus('listening');
-                    console.log('[barge-in] Playback stopped and status set to listening.');
+                    console.log('[barge-in] Playback stopped and listening resumed.');
                   }
                   showUserPartial(sc.inputTranscription.text);
                 }
@@ -669,11 +698,13 @@
                   activeClarosMsg = null;
                   setStatus('listening');
                   if (full) {
+                    var norm = normalizeTranscript(full);
+                    console.log('[transcript] Final turn.', { raw: full, normalized: norm });
                     conversationContext.push({ speaker: 'user', text: full });
                     addTranscript('user', full);
-                    var qm = QUESTION_NUM_RE.exec(full);
+                    var qm = QUESTION_NUM_RE.exec(norm);
                     if (qm) currentQuestion = parseInt(qm[1], 10);
-                    if (ANSWER_STATED_RE.test(full)) {
+                    if (ANSWER_STATED_RE.test(norm)) {
                       var tq = qm ? parseInt(qm[1], 10) : currentQuestion;
                       if (tq != null) {
                         answerReady[tq] = true;
@@ -682,10 +713,17 @@
                         if (card) card.classList.add('answer-ready');
                       }
                     }
-                    var hasIntent = WRITE_INTENT_RE.test(full);
+                    var hasIntent = WRITE_INTENT_RE.test(norm);
                     var qid = qm ? parseInt(qm[1], 10) : (currentQuestion || 1);
-                    if (hasIntent && answerReady[qid] && !writeInProgress) triggerWrite(qid);
-                    triggerVoiceExport(full);
+                    console.log('[intent] Write intent + question.', { hasWriteIntent: hasIntent, questionId: qid });
+                    if (hasIntent && answerReady[qid] && !writeInProgress) {
+                      console.log('[intent] Triggering write for question.', { questionId: qid });
+                      triggerWrite(qid);
+                    }
+                    if (hasExportIntent(norm)) {
+                      console.log('[intent] Export intent matched.', { normalized: norm });
+                    }
+                    triggerVoiceExport(full, norm);
                   }
                 }
               },
@@ -706,7 +744,13 @@
 
         var stream;
         try {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          var audioConstraints = {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            channelCount: 1
+          };
+          stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
         } catch (e) {
           errorsEl.textContent = 'Microphone access denied';
           if (liveSession.close) liveSession.close();
@@ -717,6 +761,12 @@
           return;
         }
         mediaStream = stream;
+        try {
+          var tracks = mediaStream.getAudioTracks();
+          if (tracks && tracks[0]) {
+            console.log('[mic] Track settings granted:', tracks[0].getSettings());
+          }
+        } catch (_) {}
         startMeter(stream);
 
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
