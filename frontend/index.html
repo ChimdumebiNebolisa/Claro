@@ -159,7 +159,6 @@
     .btn.export:hover { background: #4ade80; }
     .btn.export { display: none; }
     .btn.export.visible { display: block; }
-    .btn-write-answer { display: none !important; }
   </style>
 </head>
 <body>
@@ -294,22 +293,6 @@
             state.answers[q.id] = answerEl.textContent;
             if (answerEl.textContent.trim()) exportBtn.classList.add('visible');
           });
-          var writeAnswerBtn = document.createElement('button');
-          writeAnswerBtn.type = 'button';
-          writeAnswerBtn.className = 'btn btn-write-answer';
-          writeAnswerBtn.textContent = 'Write Answer';
-          writeAnswerBtn.addEventListener('click', function () {
-            var wsState = ws ? ws.readyState : -1;
-            var payload = { type: 'manual_write', question_id: q.id };
-            console.log('[WriteAnswer] Button clicked for question_id=' + q.id + ', ws.readyState=' + wsState + ' (OPEN=' + WebSocket.OPEN + ')');
-            if (ws && ws.readyState === WebSocket.OPEN) {
-              console.log('[WriteAnswer] Sending payload:', JSON.stringify(payload));
-              ws.send(JSON.stringify(payload));
-            } else {
-              console.error('[WriteAnswer] CANNOT SEND: WebSocket not open. readyState=' + wsState);
-            }
-          });
-          card.appendChild(writeAnswerBtn);
           questionsContainer.appendChild(card);
         });
         console.log('[renderQuestions] Created', state.questions?.length || 0, 'card(s). DOM children:', questionsContainer.children.length);
@@ -322,10 +305,9 @@
         return document.querySelector('.question-card[data-question-id="' + questionId + '"]');
       }
 
-      /* ── WebSocket / Audio plumbing ── */
-      const WS_BASE = location.host ? (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host : 'ws://127.0.0.1:8000';
+      const API_BASE = location.origin || 'http://127.0.0.1:8000';
 
-      let ws = null;
+      let liveSession = null;
       let audioContext = null;
       let mediaStream = null;
       let sourceNode = null;
@@ -333,6 +315,26 @@
       let playbackContext = null;
       let nextPlaybackTime = 0;
       let scheduledSources = [];
+      let conversationContext = [];
+      let answerReady = {};
+      let answerCandidate = {};
+      let currentQuestion = null;
+      let clarosOutputBuffer = '';
+      let userTranscriptBuffer = '';
+      let writeInProgress = false;
+      let keepaliveInterval = null;
+
+      var WRITE_INTENT_RE = /\b(write|put\s+that\s+down|answer\s+question|write\s+my\s+answer|write\s+it\s+down|write\s+that)\b/i;
+      var QUESTION_NUM_RE = /question\s*(\d+)/i;
+      var CLAROS_WRITE_PHRASE_RE = /let me write that for question\s*(\d+)/i;
+      var ANSWER_STATED_RE = /(?:my|the|final)\s+answer\s+is\b|i\s+think\s+(?:it'?s|it\s+is|the\s+answer\s+is)\b|(?:my|the)\s+final\s+answer\b|that'?s\s+my\s+answer\b|so\s+(?:it'?s|it\s+is|the\s+answer\s+is)\b/i;
+
+      function int16ArrayToBase64(int16Arr) {
+        var bytes = new Uint8Array(int16Arr.buffer);
+        var binary = '';
+        for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        return btoa(binary);
+      }
 
       /* ── Status ── */
       let currentMode = 'idle';
@@ -442,6 +444,59 @@
         nextPlaybackTime = 0;
       }
 
+      function triggerWrite(questionId) {
+        if (writeInProgress) return;
+        var el = getAnswerEl(questionId);
+        var card = getCardEl(questionId);
+        if (!el) return;
+        writeInProgress = true;
+        setStatus('writing');
+        el.textContent = '';
+        state.answers[questionId] = '';
+        if (card) card.classList.add('writing');
+        var url = API_BASE + '/api/write/' + state.assignmentId;
+        var body = JSON.stringify({
+          question_id: questionId,
+          conversation: conversationContext,
+          answer_candidate: answerCandidate[questionId] || ''
+        });
+        fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body })
+          .then(function (res) {
+            if (!res.ok) {
+              return res.json().catch(function () { return {}; }).then(function (data) {
+                throw new Error(data.detail || res.statusText || 'Write failed');
+              });
+            }
+            return res.body.getReader();
+          })
+          .then(function (reader) {
+            var decoder = new TextDecoder();
+            function read() {
+              return reader.read().then(function (_ref) {
+                var done = _ref.done;
+                var value = _ref.value;
+                if (done) return;
+                var text = decoder.decode(value, { stream: true });
+                if (text) {
+                  el.textContent = (el.textContent || '') + text;
+                  state.answers[questionId] = el.textContent;
+                  exportBtn.classList.add('visible');
+                }
+                return read();
+              });
+            }
+            return read();
+          })
+          .catch(function (err) {
+            errorsEl.textContent = err.message || 'Write failed';
+          })
+          .finally(function () {
+            writeInProgress = false;
+            if (card) card.classList.remove('writing');
+            setStatus(liveSession ? 'listening' : 'idle');
+          });
+      }
+
       /* ── Mic level meter ── */
       function startMeter(stream) {
         var ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -462,24 +517,146 @@
         tick();
       }
 
-      /* ── Session lifecycle ── */
+      /* ── Session lifecycle (direct Gemini Live) ── */
       async function startSession() {
         if (!state.assignmentId) return;
         errorsEl.textContent = '';
         setStatus('connecting');
         micBtn.disabled = true;
         micBtn.textContent = 'Connecting\u2026';
-        var wsUrl = WS_BASE + '/session/' + state.assignmentId;
-        ws = new WebSocket(wsUrl);
-        ws.binaryType = 'arraybuffer';
+        conversationContext = [];
+        answerReady = {};
+        answerCandidate = {};
+        currentQuestion = null;
+        clarosOutputBuffer = '';
+        userTranscriptBuffer = '';
 
-        await new Promise(function (resolve, reject) {
-          ws.onopen = function () { resolve(); };
-          ws.onerror = function () { reject(new Error('WebSocket failed')); };
-          setTimeout(function () { reject(new Error('Connection timeout')); }, 15000);
-        });
+        var config;
+        try {
+          var r = await fetch(API_BASE + '/api/session-config/' + state.assignmentId);
+          if (!r.ok) throw new Error(r.status === 404 ? 'Assignment not found' : (await r.text()) || 'Session config failed');
+          config = await r.json();
+        } catch (e) {
+          errorsEl.textContent = e.message || 'Failed to get session config';
+          setStatus('idle');
+          micBtn.disabled = false;
+          micBtn.textContent = 'Start Session';
+          return;
+        }
 
-        var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        var GoogleGenAI;
+        try {
+          var mod = await import('https://esm.sh/@google/genai');
+          GoogleGenAI = mod.GoogleGenAI || mod.default;
+        } catch (e) {
+          errorsEl.textContent = 'Failed to load Gemini SDK: ' + (e.message || e);
+          setStatus('idle');
+          micBtn.disabled = false;
+          micBtn.textContent = 'Start Session';
+          return;
+        }
+
+        var ai = new GoogleGenAI({ apiKey: config.token });
+        var session;
+        try {
+          session = await ai.live.connect({
+            model: config.model,
+            config: {
+              responseModalities: ['AUDIO'],
+              speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } } },
+              systemInstruction: { parts: [{ text: config.system_prompt || '' }] },
+              inputAudioTranscription: {},
+              outputAudioTranscription: {}
+            },
+            callbacks: {
+              onmessage: function (msg) {
+                var sc = msg.serverContent;
+                if (!sc) return;
+                if (sc.setupComplete) { setStatus('listening'); return; }
+                if (sc.inputTranscription && sc.inputTranscription.text) {
+                  userTranscriptBuffer += sc.inputTranscription.text;
+                  clearPlayback();
+                  activeClarosMsg = null;
+                  if (currentMode === 'speaking') setStatus('listening');
+                  showUserPartial(sc.inputTranscription.text);
+                }
+                if (sc.outputTranscription && sc.outputTranscription.text) {
+                  var text = sc.outputTranscription.text;
+                  conversationContext.push({ speaker: 'claros', text: text });
+                  addTranscript('claros', text);
+                  clarosOutputBuffer += text;
+                  if (clarosOutputBuffer.length > 2000) clarosOutputBuffer = clarosOutputBuffer.slice(-1000);
+                  var m = CLAROS_WRITE_PHRASE_RE.exec(clarosOutputBuffer);
+                  if (m && !writeInProgress) {
+                    var qid = parseInt(m[1], 10);
+                    if (answerReady[qid]) {
+                      clarosOutputBuffer = '';
+                      triggerWrite(qid);
+                    }
+                  }
+                }
+                if (sc.modelTurn && sc.modelTurn.parts) {
+                  for (var i = 0; i < sc.modelTurn.parts.length; i++) {
+                    var part = sc.modelTurn.parts[i];
+                    if (part.inlineData && part.inlineData.data) {
+                      queuePcm24kChunk(part.inlineData.data);
+                      if (!writeInProgress) setStatus('speaking');
+                    }
+                  }
+                }
+                if (sc.turnComplete) {
+                  var full = userTranscriptBuffer.trim();
+                  userTranscriptBuffer = '';
+                  clearUserPartial();
+                  activeClarosMsg = null;
+                  setStatus('listening');
+                  if (full) {
+                    conversationContext.push({ speaker: 'user', text: full });
+                    addTranscript('user', full);
+                    var qm = QUESTION_NUM_RE.exec(full);
+                    if (qm) currentQuestion = parseInt(qm[1], 10);
+                    if (ANSWER_STATED_RE.test(full)) {
+                      var tq = qm ? parseInt(qm[1], 10) : currentQuestion;
+                      if (tq != null) {
+                        answerReady[tq] = true;
+                        answerCandidate[tq] = full;
+                        var card = getCardEl(tq);
+                        if (card) card.classList.add('answer-ready');
+                      }
+                    }
+                    var hasIntent = WRITE_INTENT_RE.test(full);
+                    var qid = qm ? parseInt(qm[1], 10) : (currentQuestion || 1);
+                    if (hasIntent && answerReady[qid] && !writeInProgress) triggerWrite(qid);
+                  }
+                }
+              },
+              onerror: function (e) { errorsEl.textContent = (e && e.message) || 'Gemini Live error'; },
+              onclose: function () { setStatus('idle'); stopSession(); }
+            }
+          });
+        } catch (e) {
+          errorsEl.textContent = (e && e.message) || 'Failed to connect to Gemini Live';
+          setStatus('idle');
+          micBtn.disabled = false;
+          micBtn.textContent = 'Start Session';
+          return;
+        }
+
+        liveSession = session;
+        setStatus('listening');
+
+        var stream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (e) {
+          errorsEl.textContent = 'Microphone access denied';
+          if (liveSession.close) liveSession.close();
+          liveSession = null;
+          setStatus('idle');
+          micBtn.disabled = false;
+          micBtn.textContent = 'Start Session';
+          return;
+        }
         mediaStream = stream;
         startMeter(stream);
 
@@ -489,7 +666,7 @@
         sourceNode = audioContext.createMediaStreamSource(stream);
         processorNode = audioContext.createScriptProcessor(1024, 1, 1);
         processorNode.onaudioprocess = function (e) {
-          if (!ws || ws.readyState !== WebSocket.OPEN) return;
+          if (!liveSession) return;
           var input = e.inputBuffer.getChannelData(0);
           var outSamples = Math.floor(input.length / ratio);
           var out = new Int16Array(outSamples);
@@ -498,99 +675,35 @@
             var s = Math.max(-1, Math.min(1, input[idx]));
             out[i] = s < 0 ? s * 32768 : s * 32767;
           }
-          ws.send(out.buffer);
+          try {
+            liveSession.sendRealtimeInput({ audio: { data: int16ArrayToBase64(out), mimeType: 'audio/pcm;rate=16000' } });
+          } catch (_) {}
         };
         sourceNode.connect(processorNode);
         processorNode.connect(audioContext.destination);
 
+        var SILENT_320 = new Int16Array(320);
+        keepaliveInterval = setInterval(function () {
+          if (!liveSession) return;
+          try {
+            liveSession.sendRealtimeInput({ audio: { data: int16ArrayToBase64(SILENT_320), mimeType: 'audio/pcm;rate=16000' } });
+          } catch (_) {}
+        }, 5000);
+
         micBtn.disabled = false;
         micBtn.textContent = 'End Session';
         micBtn.classList.add('stop');
-
-        ws.onmessage = function (ev) {
-          if (typeof ev.data !== 'string') return;
-          try {
-            var msg = JSON.parse(ev.data);
-            console.log('[ws.onmessage] Received:', msg.type, msg);
-
-            if (msg.type === 'status' && msg.mode) {
-              var mapped = msg.mode === 'teaching' ? 'listening' : msg.mode;
-              setStatus(mapped);
-              if (mapped === 'listening') {
-                activeClarosMsg = null;
-                if (userPartialEl) clearUserPartial();
-              }
-            }
-            else if (msg.type === 'user_speech_partial') {
-              clearPlayback();
-              activeClarosMsg = null;
-              if (currentMode === 'speaking') setStatus('listening');
-              showUserPartial(msg.text || '');
-            }
-            else if (msg.type === 'transcript') {
-              if (msg.speaker === 'user') {
-                clearUserPartial();
-                addTranscript('user', msg.text || '');
-              } else {
-                addTranscript(msg.speaker || 'claros', msg.text || '');
-              }
-            }
-            else if (msg.type === 'audio') {
-              queuePcm24kChunk(msg.data);
-              if (currentMode !== 'writing') setStatus('speaking');
-            }
-            else if (msg.type === 'write_start') {
-              console.log('[write_start] question_id=' + msg.question_id);
-              var el = getAnswerEl(msg.question_id);
-              var card = getCardEl(msg.question_id);
-              if (el) {
-                console.log('[write_start] Clearing answer field for question_id=' + msg.question_id);
-                el.textContent = ''; state.answers[msg.question_id] = '';
-              } else {
-                console.error('[write_start] getAnswerEl returned NULL for question_id=' + msg.question_id);
-              }
-              if (card) card.classList.add('writing');
-            }
-            else if (msg.type === 'write_token') {
-              var el = getAnswerEl(msg.question_id);
-              if (el) {
-                var tokenLen = (msg.text || '').length;
-                el.textContent = (el.textContent || '') + (msg.text || '');
-                state.answers[msg.question_id] = el.textContent;
-                console.log('[write_token] question_id=' + msg.question_id + ' +' + tokenLen + ' chars, total=' + el.textContent.length);
-                exportBtn.classList.add('visible');
-              } else {
-                console.error('[write_token] getAnswerEl returned NULL for question_id=' + msg.question_id);
-              }
-            }
-            else if (msg.type === 'write_end') {
-              console.log('[write_end] question_id=' + msg.question_id + ' COMPLETE');
-              var card = getCardEl(msg.question_id);
-              if (card) card.classList.remove('writing');
-            }
-            else if (msg.type === 'answer_ready') {
-              console.log('[answer_ready] question_id=' + msg.question_id);
-              var card = getCardEl(msg.question_id);
-              if (card) card.classList.add('answer-ready');
-            }
-            else if (msg.type === 'error') {
-              errorsEl.textContent = msg.message || '';
-            }
-          } catch (err) { console.error(err); }
-        };
-
-        ws.onclose = function () { setStatus('idle'); stopSession(); };
-        ws.onerror = function () { errorsEl.textContent = 'WebSocket error'; };
       }
 
       function stopSession() {
+        if (keepaliveInterval) { clearInterval(keepaliveInterval); keepaliveInterval = null; }
         clearPlayback();
         if (processorNode) {
           try { processorNode.disconnect(); sourceNode && sourceNode.disconnect(); } catch (_) {}
           processorNode = null; sourceNode = null;
         }
         if (mediaStream) { mediaStream.getTracks().forEach(function (t) { t.stop(); }); mediaStream = null; }
-        if (ws) { ws.close(); ws = null; }
+        if (liveSession && liveSession.close) { try { liveSession.close(); } catch (_) {} liveSession = null; }
         nextPlaybackTime = 0;
         if (audioContext) { audioContext.close(); audioContext = null; }
         meterBar.style.width = '0%';
@@ -603,7 +716,7 @@
       }
 
       micBtn.addEventListener('click', function () {
-        if (ws && ws.readyState === WebSocket.OPEN) stopSession();
+        if (liveSession) stopSession();
         else startSession();
       });
 

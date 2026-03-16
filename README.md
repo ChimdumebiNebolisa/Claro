@@ -29,7 +29,7 @@ Claros enforces a deliberate constraint: **it will not write an answer until the
 
 - If the student asks Claros to write before they have given their answer, Claros responds: *"Tell me your final answer first, then I can write it into the worksheet."*
 - This rule is enforced per question. Stating an answer for question 1 does not unlock writing for question 2.
-- The answer readiness gate operates at both the system prompt level (Claros is instructed to refuse) and the backend level (the write pipeline is blocked until the answer is confirmed).
+- The answer readiness gate operates at the system prompt level (Claros is instructed to refuse) and the frontend (the write action is only triggered when the student has stated their answer for that question).
 
 This is an intentional product decision. Claros is designed to support learning, not to bypass it. The voice interface removes the typing barrier; the readiness gate preserves the reasoning requirement.
 
@@ -44,35 +44,36 @@ This is not about making assignments easier. It is about making them accessible 
 - **PDF assignment ingestion** — Upload any PDF with "Question N:" formatting. Questions are extracted and rendered as an interactive worksheet.
 - **Real-time voice conversation** — Bidirectional audio through Gemini Live. The student speaks and hears Claros respond with natural voice.
 - **Socratic guidance** — Claros defaults to teaching mode, asking guiding questions rather than stating answers.
-- **Per-question answer readiness tracking** — The backend tracks whether the student has stated a final answer for each question before allowing a write.
-- **Controlled answer writing** — When permitted, the answer is streamed token-by-token into the correct question field via a separate text generation call.
-- **Live transcript** — Both sides of the conversation are transcribed and displayed in real time.
+- **Per-question answer readiness tracking** — The frontend tracks whether the student has stated a final answer for each question before allowing a write.
+- **Controlled answer writing** — When permitted, the frontend calls the backend write API; the answer is streamed into the correct question field via Gemini text generation.
+- **Live transcript** — Both sides of the conversation are transcribed and displayed in real time (from Gemini Live in the browser).
 - **PDF export** — Export all questions and current answers as a formatted PDF document.
-- **Answer-stated indicator** — The UI shows a visual badge when the backend confirms the student has stated their answer for a given question.
+- **Answer-stated indicator** — The UI shows a visual badge when the student has stated their answer for a given question.
 
 ## Architecture
 
 ```
 Browser (frontend/index.html)
   │
-  ├── WebSocket /session/{id} (binary audio + JSON control messages)
-  │
+  ├── GET /api/session-config/{id}  → ephemeral token + system prompt + model
+  ├── Direct WebSocket to Gemini Live API (voice: audio in/out, transcription)
+  │     via @google/genai JS SDK, using ephemeral token (API key never in frontend)
+  └── POST /api/write/{id} (streaming) → answer text for a question
+
 FastAPI backend (main.py)
   │
-  ├── Gemini Live API (real-time voice: audio in/out, transcription)
-  │     via google-genai SDK → models.live.connect()
-  ├── Gemini 2.5 Flash (text generation for controlled answer writing)
-  │     via google-genai SDK → models.generate_content_stream()
+  ├── Ephemeral token creation (auth_tokens.create) for browser–Gemini Live
+  ├── Gemini 2.5 Flash (text) for answer writing via generate_content_stream()
   ├── PDF parser (parser.py — PyMuPDF)
   ├── PDF exporter (exporter.py — ReportLab)
   └── Google Cloud Storage (assignment PDF persistence)
 ```
 
-**Voice conversation** uses the Gemini Live API through the Google GenAI SDK (`google-genai`). The browser captures microphone input at 16 kHz PCM, sends it over WebSocket, and receives audio responses for playback. Both input and output are transcribed in real time.
+**Real-time voice** uses **Gemini Live directly from the browser**. The backend does not proxy audio. On "Start Session", the frontend fetches an ephemeral token and session config from `GET /api/session-config/{assignment_id}`, then connects to Gemini Live using the `@google/genai` JavaScript SDK. The browser captures mic at 16 kHz PCM, sends audio to Gemini, and plays back responses. Transcripts are handled in the client; write detection (e.g. "write my answer for question N") and answer-stated detection run in the frontend.
 
-**Answer writing** uses a separate Gemini text model (default: Gemini 2.5 Flash) via the same SDK. When a write is triggered, the backend constructs a prompt from the conversation context and the student's stated answer, then streams the generated text to the frontend via `write_start` / `write_token` / `write_end` WebSocket messages.
+**Answer writing** is triggered when the user (or Claros) asks to write and the student has already stated their answer for that question. The frontend calls `POST /api/write/{assignment_id}` with conversation context and receives a streaming text response, which is appended into the correct question field.
 
-**Answer readiness gating** is enforced in the backend. A per-question state model tracks whether the student has stated their answer (via heuristic phrase detection on transcribed utterances). Write requests are blocked if the answer has not been confirmed for the target question.
+**Answer readiness gating** is enforced in the frontend: the UI and write flow only allow writing once the student has stated their answer (detected via phrase patterns). The backend write endpoint does not re-check; it assumes the frontend enforces the product rule.
 
 **PDF pipeline**: Uploaded PDFs are stored in Google Cloud Storage, parsed with PyMuPDF to extract questions matching a `Question N:` pattern, and can be exported back as formatted PDFs with answers using ReportLab.
 
@@ -81,8 +82,8 @@ FastAPI backend (main.py)
 Claros is deployed on **Google Cloud Run** as a containerized service.
 
 - **Container image** is built from the project `Dockerfile` (Python 3.11, FastAPI/Uvicorn).
-- **Assignment PDFs** are stored in a **Google Cloud Storage** bucket. The upload endpoint writes to GCS; the voice session and export endpoints read from GCS.
-- **Gemini API** calls (both Live and text) are made from the Cloud Run backend using an API key set as an environment variable.
+- **Assignment PDFs** are stored in a **Google Cloud Storage** bucket. The upload, session-config, write, and export endpoints use GCS where needed.
+- **Gemini API**: The backend holds the Gemini API key and uses it only to (1) create ephemeral tokens for the browser–Gemini Live connection and (2) run the text model for answer writing. The browser never receives the API key; it uses a short-lived token for Live only.
 - Cloud Run provides automatic HTTPS, scaling, and a public URL for the frontend.
 
 **Deploying:**
@@ -107,8 +108,8 @@ Replace `<PROJECT_ID>`, `<REGION>`, `<key>`, `<bucket>`, and `<project>` with yo
 | Layer | Technology |
 |-------|-----------|
 | Backend | Python, FastAPI, Uvicorn |
-| Voice AI | Gemini Live API (via Google GenAI SDK) |
-| Text AI | Gemini 2.5 Flash (via Google GenAI SDK) |
+| Voice AI | Gemini Live API (direct from browser via @google/genai JS SDK; ephemeral token from backend) |
+| Text AI | Gemini 2.5 Flash (backend, for answer writing) |
 | PDF parsing | PyMuPDF (fitz) |
 | PDF export | ReportLab |
 | Storage | Google Cloud Storage |
@@ -170,12 +171,14 @@ Local development may also require Google Cloud application credentials for GCS 
 ## Current Limitations
 
 - **Worksheet-focused scope** — Claros works with structured assignments that follow a "Question N:" format. It is not a general-purpose document editor.
-- **Heuristic answer detection** — Answer readiness is determined by matching common phrasing patterns (e.g., "my answer is…", "I think it's…"). Unusual phrasings may not be detected.
-- **Single-session state** — Answer readiness and conversation context are held in memory per WebSocket session. Refreshing the page starts a new session.
+- **Heuristic answer detection** — Answer readiness is determined in the frontend by matching common phrasing patterns (e.g., "my answer is…", "I think it's…"). Unusual phrasings may not be detected.
+- **Single-session state** — Conversation and answer readiness are held in memory in the browser. Refreshing the page starts a new session.
 - **PDF format dependency** — Question extraction relies on "Question N:" line patterns. PDFs with different formatting may fall back to single-block extraction.
-- **Voice model compliance** — The system prompt instructs Claros to follow specific rules, but LLM compliance is not guaranteed. The backend gate provides a safety net.
-- **Basic barge-in** — Claros supports simple interruption: if the user starts speaking while Claros is talking, playback stops and the app returns to listening. This is not full-duplex; there may be a brief overlap before the interruption is detected.
-- **Browser compatibility** — Requires a modern browser with WebSocket, AudioContext, and getUserMedia support. Tested primarily on Chrome.
+- **Voice model compliance** — The system prompt instructs Claros to follow specific rules, but LLM compliance is not guaranteed. The product rule (write only after answer stated) is enforced in the frontend.
+- **Direct Gemini Live** — Voice runs browser → Gemini Live. The frontend loads the `@google/genai` SDK from a CDN (esm.sh). If the CDN is blocked or slow, the voice session may not start.
+- **Ephemeral tokens** — Session config uses the Gemini API to create short-lived tokens. If token creation fails (e.g. API or region limitation), the backend returns 500 and the user must retry or check logs.
+- **Basic barge-in** — When the user starts speaking while Claros is talking, playback stops and the app returns to listening. This is not full-duplex.
+- **Browser compatibility** — Requires a modern browser with WebSocket, AudioContext, and getUserMedia. Tested primarily on Chrome.
 
 ## Future Improvements
 
