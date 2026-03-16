@@ -109,6 +109,7 @@ def get_session_config(assignment_id: str):
     api_key = get_api_key()
     client = genai.Client(api_key=api_key, http_options=types.HttpOptions(api_version="v1alpha"))
     now_utc = datetime.datetime.now(datetime.timezone.utc)
+    # Ephemeral token for browser Live; frontend must use same LIVE_MODEL and v1alpha.
     try:
         token = client.auth_tokens.create(
             config=types.CreateAuthTokenConfig(

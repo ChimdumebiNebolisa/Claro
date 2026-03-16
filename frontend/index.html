@@ -557,7 +557,13 @@
           return;
         }
 
-        var ai = new GoogleGenAI({ apiKey: config.token });
+        var ai = new GoogleGenAI({
+          apiKey: config.token,
+          httpOptions: { apiVersion: 'v1alpha' }
+        });
+        if (typeof console !== 'undefined' && console.log) {
+          console.log('[Claros] Live connect: token present=' + !!(config.token) + ', token length=' + (config.token ? String(config.token).length : 0) + ', model=' + (config.model || '') + ', apiVersion=v1alpha, SDK client created with v1alpha');
+        }
         var session;
         try {
           session = await ai.live.connect({
