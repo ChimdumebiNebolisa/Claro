@@ -151,10 +151,14 @@ async def stream_write(assignment_id: str, body: WriteRequest):
     candidate = body.answer_candidate or ""
     candidate_empty = not bool(candidate.strip())
     print(
-        "[write] Incoming request.",
-        "question_id=", body.question_id,
-        "candidate_empty=", candidate_empty,
-        "candidate_preview=", repr(candidate[:120]),
+        "[write-chain] Backend received POST /api/write/",
+        assignment_id,
+        "question_id=",
+        body.question_id,
+        "candidate_empty=",
+        candidate_empty,
+        "candidate_preview=",
+        repr(candidate[:120] if candidate else ""),
     )
     if candidate_empty:
         raise HTTPException(status_code=400, detail="Student must state the answer before writing is allowed.")
@@ -182,6 +186,8 @@ Based on what was discussed, write only the answer text for Question {body.quest
     client = genai.Client(api_key=api_key, http_options=types.HttpOptions(api_version="v1alpha"))
     text_model = os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-flash").strip()
 
+    chunk_count = [0]
+
     async def generate():
         try:
             stream = await client.aio.models.generate_content_stream(
@@ -191,7 +197,12 @@ Based on what was discussed, write only the answer text for Question {body.quest
             async for chunk in stream:
                 text = getattr(chunk, "text", None)
                 if text:
+                    chunk_count[0] += 1
+                    if chunk_count[0] == 1:
+                        preview = (text[:80] + "...") if len(text) > 80 else text
+                        print("[write-chain] Backend first chunk sent len=", len(text), "preview=", repr(preview))
                     yield text
+            print("[write-chain] Backend stream finished total_chunks_sent=", chunk_count[0])
         except Exception as e:
             print(f"[stream_write] {type(e).__name__}: {e}")
             traceback.print_exc()

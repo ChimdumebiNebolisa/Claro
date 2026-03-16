@@ -327,7 +327,7 @@
 
       var WRITE_INTENT_RE = /\b(write|put\s+that\s+down|answer\s+question|write\s+my\s+answer|write\s+it\s+down|write\s+that)\b/;
       var QUESTION_NUM_RE = /question\s*(\d+)/;
-      var CLAROS_WRITE_PHRASE_RE = /let me write that for question\s*(\d+)/;
+      var CLAROS_WRITE_PHRASE_RE = /let me write that for question\s*(\d+)/i;
       var ANSWER_STATED_RE = /(?:my|the|final)\s+answer\s+is\b|i\s+think\s+(?:its|it\s+is|the\s+answer\s+is)\b|(?:my|the)\s+final\s+answer\b|thats\s+my\s+answer\b|so\s+(?:its|it\s+is|the\s+answer\s+is)\b/;
 
       function int16ArrayToBase64(int16Arr) {
@@ -510,29 +510,28 @@
       }
 
       function triggerWrite(questionId) {
-        console.log('[write] triggerWrite called.', {
-          questionId: questionId,
-          writeInProgress: writeInProgress,
-          answerCandidatePreview: (answerCandidate[questionId] || '').slice(0, 120)
-        });
+        var qid = questionId;
+        var candPreview = (answerCandidate[qid] || '').slice(0, 120);
+        var aid = state.assignmentId;
+        console.log('[write-chain] triggerWrite qid=' + qid + ' writeInProgress=' + writeInProgress + ' answerCandidate preview=' + (candPreview ? '"' + candPreview + '"' : '(empty)') + ' assignmentId=' + (aid || '(null)'));
         if (writeInProgress) {
-          console.log('[write] Aborting triggerWrite because writeInProgress is true.');
+          console.log('[write-chain] Aborting triggerWrite: writeInProgress is true');
           return;
         }
-        var el = getAnswerEl(questionId);
+        var selector = '.answer-field[data-question-id="' + questionId + '"]';
+        var el = document.querySelector(selector);
         var card = getCardEl(questionId);
-        if (!el) return;
+        if (!el) {
+          console.log('[write-chain] triggerWrite aborted: element not found selector=' + selector);
+          return;
+        }
         writeInProgress = true;
         setStatus('writing');
         el.textContent = '';
         state.answers[questionId] = '';
         if (card) card.classList.add('writing');
         var url = API_BASE + '/api/write/' + state.assignmentId;
-        console.log('[write] Sending /api/write request.', {
-          url: url,
-          questionId: questionId,
-          answerCandidatePreview: (answerCandidate[questionId] || '').slice(0, 120)
-        });
+        console.log('[write-chain] Sending fetch qid=' + qid + ' url=' + url);
         var body = JSON.stringify({
           question_id: questionId,
           conversation: conversationContext,
@@ -549,15 +548,31 @@
           })
           .then(function (reader) {
             var decoder = new TextDecoder();
+            var totalChars = 0;
+            var firstChunkLogged = false;
             function read() {
               return reader.read().then(function (_ref) {
                 var done = _ref.done;
                 var value = _ref.value;
-                if (done) return;
+                if (done) {
+                  console.log('[write-chain] Stream done qid=' + qid + ' totalCharsAppended=' + totalChars);
+                  return;
+                }
                 var text = decoder.decode(value, { stream: true });
                 if (text) {
-                  el.textContent = (el.textContent || '') + text;
-                  state.answers[questionId] = el.textContent;
+                  if (!firstChunkLogged) {
+                    console.log('[write-chain] First chunk received qid=' + qid + ' chunkLength=' + text.length + ' chunkPreview=' + (text.length > 80 ? '"' + text.slice(0, 80) + '..."' : '"' + text + '"'));
+                    firstChunkLogged = true;
+                  }
+                  totalChars += text.length;
+                  var targetEl = document.querySelector(selector);
+                  if (!targetEl) {
+                    console.log('[write-chain] DOM update FAILED qid=' + qid + ' selector=' + selector + ' elementFound=false (element missing when appending)');
+                  } else {
+                    targetEl.textContent = (targetEl.textContent || '') + text;
+                    state.answers[questionId] = targetEl.textContent;
+                    console.log('[write-chain] DOM updated qid=' + qid + ' selector=' + selector + ' elementFound=true lengthAfterAppend=' + targetEl.textContent.length);
+                  }
                   exportBtn.classList.add('visible');
                 }
                 return read();
@@ -687,11 +702,18 @@
                   clarosOutputBuffer += text;
                   if (clarosOutputBuffer.length > 2000) clarosOutputBuffer = clarosOutputBuffer.slice(-1000);
                   var m = CLAROS_WRITE_PHRASE_RE.exec(clarosOutputBuffer);
-                  if (m && !writeInProgress) {
+                  if (m) {
                     var qid = parseInt(m[1], 10);
-                    if (answerReady[qid]) {
+                    var matchedText = m[0];
+                    console.log('[write-chain] Claros write phrase detected qid=' + qid + ' text="' + matchedText + '"');
+                    if (!writeInProgress && answerReady[qid]) {
                       clarosOutputBuffer = '';
+                      console.log('[write-chain] triggerWrite about to run qid=' + qid);
                       triggerWrite(qid);
+                    } else if (writeInProgress) {
+                      console.log('[write-chain] Skipping triggerWrite (phrase path): writeInProgress=true');
+                    } else if (!answerReady[qid]) {
+                      console.log('[write-chain] Skipping triggerWrite (phrase path): answerReady[' + qid + ']=false');
                     }
                   }
                 }
@@ -756,7 +778,7 @@
                       writeInProgress: writeInProgress
                     });
                     if (hasIntent && answerReady[qid] && !writeInProgress) {
-                      console.log('[intent] Calling triggerWrite for question.', { qid: qid });
+                      console.log('[write-chain] triggerWrite about to run qid=' + qid);
                       triggerWrite(qid);
                     } else if (hasIntent && !answerReady[qid]) {
                       console.log('[intent] Not writing because answerReady is false after fallback.', { qid: qid });
