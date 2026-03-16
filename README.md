@@ -6,7 +6,7 @@
 
 ## Demo
 
-[**Watch the demo**](https://www.youtube.com/watch?v=lBat2W_Ycsk) — voice session, guided reasoning, and writing answers into the worksheet.
+[**Watch the demo**](https://www.youtube.com/watch?v=lBat2W_Ycsk)
 
 ## The Problem
 
