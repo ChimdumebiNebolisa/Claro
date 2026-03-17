@@ -1,0 +1,4 @@
+# Dev and test dependencies (install with: pip install -r requirements-dev.txt)
+-r requirements-server.txt
+pytest
+pytest-cov
