@@ -305,6 +305,15 @@ async def serve_genai_bundle():
     return FileResponse(path, media_type="application/javascript; charset=utf-8")
 
 
+@app.get("/session-rules.js", response_class=Response)
+async def serve_session_rules():
+    """Serve session intent helpers used by the worksheet UI (see tests/session-rules.test.cjs)."""
+    path = ROOT / "frontend" / "session-rules.js"
+    if not path.exists():
+        raise HTTPException(status_code=503, detail="session-rules.js missing from frontend/")
+    return FileResponse(path, media_type="application/javascript; charset=utf-8")
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index():
     """Serve the Claros app (frontend/index.html)."""

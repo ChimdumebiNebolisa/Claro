@@ -199,6 +199,14 @@ pip install -r requirements-dev.txt
 pytest tests/
 ```
 
+**Light evaluation (deterministic):**
+
+- **Parser / worksheet extraction** — Golden PDFs built in [tests/conftest.py](tests/conftest.py) and asserted in [tests/test_parser.py](tests/test_parser.py) (including double-digit `Question 10:`, multiline merges, numbered continuations).
+- **Write API placement** — [tests/test_write_api.py](tests/test_write_api.py) mocks GCS and Gemini; checks unknown `question_id` returns 400 and valid ids stream without calling external APIs.
+- **Session intent strings** — [frontend/session-rules.js](frontend/session-rules.js) holds normalize / regex helpers; table cases in [tests/session-rules.test.cjs](tests/session-rules.test.cjs). Run: `npm run test:session-rules` (Node only; no `npm install` required for this script).
+
+GitHub Actions runs `pytest tests/` and `npm run test:session-rules` on every push and pull request (see [.github/workflows/ci.yml](.github/workflows/ci.yml)).
+
 The optional `requirements-voice.txt` stack is for `test_voice.py` (standalone mic/speaker voice test); the main app uses `requirements-server.txt` only.
 
 ## Current Limitations

@@ -2,7 +2,7 @@
 PDF export for Claros: generates a PDF with assignment title, questions, and written answers.
 """
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from io import BytesIO
 from typing import List
 
@@ -67,7 +67,7 @@ def build_export_pdf(
     story.append(Spacer(1, 0.3 * inch))
     story.append(
         Paragraph(
-            f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+            f"Generated {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}",
             ParagraphStyle("Footer", parent=body_style, fontSize=8, textColor="gray"),
         )
     )

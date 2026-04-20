@@ -24,3 +24,27 @@ def test_test_page_returns_html():
     assert response.status_code in (200, 404)
     if response.status_code == 200:
         assert "text/html" in response.headers.get("content-type", "")
+
+
+def test_genai_bundle_served_and_non_empty():
+    """Bundled Gemini SDK must be present (Cloud Run / CI smoke)."""
+    response = client.get("/genai.bundle.js")
+    assert response.status_code == 200
+    assert "javascript" in response.headers.get("content-type", "").lower()
+    assert len(response.content) > 1000
+
+
+def test_test_assignment_pdf_served():
+    """Built-in test PDF is shipped for local/demo use."""
+    response = client.get("/test-assignment.pdf")
+    assert response.status_code == 200
+    assert response.headers.get("content-type", "").lower().startswith("application/pdf")
+    assert response.content[:4] == b"%PDF"
+
+
+def test_session_rules_js_served():
+    """Session gating script for the worksheet UI."""
+    response = client.get("/session-rules.js")
+    assert response.status_code == 200
+    assert "javascript" in response.headers.get("content-type", "").lower()
+    assert b"ClarosSessionRules" in response.content

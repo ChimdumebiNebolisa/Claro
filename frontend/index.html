@@ -267,6 +267,7 @@
     </div>
   </div>
 
+  <script src="/session-rules.js"></script>
   <script>
     (function () {
       const SAMPLE_RATE = 16000;
@@ -286,6 +287,18 @@
       const errorsEl = document.getElementById('errors');
       const micBtn = document.getElementById('micBtn');
       const interruptBtn = document.getElementById('interruptBtn');
+
+      const SR = typeof ClarosSessionRules !== 'undefined' ? ClarosSessionRules : null;
+      if (!SR) {
+        errorsEl.textContent = 'Claros failed to load session rules (session-rules.js).';
+        throw new Error('ClarosSessionRules missing');
+      }
+      var normalizeTranscript = SR.normalizeTranscript;
+      var WRITE_INTENT_RE = SR.WRITE_INTENT_RE;
+      var QUESTION_NUM_RE = SR.QUESTION_NUM_RE;
+      var CLAROS_WRITE_PHRASE_RE = SR.CLAROS_WRITE_PHRASE_RE;
+      var ANSWER_STATED_RE = SR.ANSWER_STATED_RE;
+      var hasExportIntent = SR.hasExportIntent;
 
       /* ── Upload ── */
       uploadZone.addEventListener('click', () => fileInput.click());
@@ -403,38 +416,11 @@
       let writeInProgress = false;
       let keepaliveInterval = null;
 
-      var WRITE_INTENT_RE = /\b(write|put\s+that\s+down|answer\s+question|write\s+my\s+answer|write\s+it\s+down|write\s+that)\b/;
-      var QUESTION_NUM_RE = /question\s*(\d+)/;
-      var CLAROS_WRITE_PHRASE_RE = /let me write that for question\s*(\d+)/i;
-      var ANSWER_STATED_RE = /(?:my|the|final)\s+answer\s+is\b|i\s+think\s+(?:its|it\s+is|the\s+answer\s+is)\b|(?:my|the)\s+final\s+answer\b|thats\s+my\s+answer\b|so\s+(?:its|it\s+is|the\s+answer\s+is)\b/;
-
       function int16ArrayToBase64(int16Arr) {
         var bytes = new Uint8Array(int16Arr.buffer);
         var binary = '';
         for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
         return btoa(binary);
-      }
-
-      function normalizeTranscript(text) {
-        if (!text) return '';
-        var s = String(text)
-          .toLowerCase()
-          .trim()
-          .replace(/[.,!?;:"]/g, ' ')
-          .replace(/\s+/g, ' ');
-        return s;
-      }
-
-      function hasExportIntent(norm) {
-        if (!norm) return false;
-        return norm.indexOf('export pdf') !== -1 ||
-          norm.indexOf('export as pdf') !== -1 ||
-          norm.indexOf('export this as pdf') !== -1 ||
-          norm.indexOf('download pdf') !== -1 ||
-          norm.indexOf('download the pdf') !== -1 ||
-          norm.indexOf('save as pdf') !== -1 ||
-          norm.indexOf('save this as pdf') !== -1 ||
-          norm.indexOf('save it as pdf') !== -1;
       }
 
       /* ── Status ── */

@@ -41,3 +41,31 @@ def test_parse_pdf_fallback_single_block(tmp_pdf_no_questions):
     assert len(questions) == 1
     assert questions[0].id == 0
     assert "paragraph" in questions[0].text or "text" in questions[0].text.lower()
+
+
+def test_parse_pdf_question_double_digit(tmp_pdf_question_double_digit):
+    """Parser preserves double-digit Question ids (e.g. 10)."""
+    _, questions = parse_pdf(tmp_pdf_question_double_digit)
+    ids = {q.id for q in questions}
+    assert 1 in ids
+    assert 10 in ids
+    q10 = next(q for q in questions if q.id == 10)
+    assert "Tenth" in q10.text or "tenth" in q10.text.lower()
+
+
+def test_parse_pdf_question_multiline_continuation(tmp_pdf_question_multiline):
+    """Lines after Question 1: without a new Question header merge into question 1."""
+    _, questions = parse_pdf(tmp_pdf_question_multiline)
+    assert len(questions) >= 2
+    q1 = next(q for q in questions if q.id == 1)
+    assert "Start of problem" in q1.text
+    assert "continuation" in q1.text.lower()
+
+
+def test_parse_pdf_numbered_continuation_merged(tmp_pdf_numbered_with_continuation):
+    """Non-numbered line after '1.' is merged into question 1 until '2.'."""
+    _, questions = parse_pdf(tmp_pdf_numbered_with_continuation)
+    assert len(questions) >= 2
+    q1 = next(q for q in questions if q.id == 1)
+    assert "Alpha" in q1.text
+    assert "Extra detail" in q1.text or "extra detail" in q1.text.lower()

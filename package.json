@@ -3,7 +3,8 @@
   "private": true,
   "description": "One-time build of @google/genai for frontend; not used at runtime.",
   "scripts": {
-    "build:genai": "node build-genai.mjs"
+    "build:genai": "node build-genai.mjs",
+    "test:session-rules": "node tests/session-rules.test.cjs"
   },
   "devDependencies": {
     "@google/genai": "^1.45.0",

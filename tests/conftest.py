@@ -46,3 +46,47 @@ def tmp_pdf_no_questions(tmp_path):
     doc.save(str(path))
     doc.close()
     return path
+
+
+@pytest.fixture
+def tmp_pdf_question_double_digit(tmp_path):
+    """PDF with Question 10: to validate double-digit question ids."""
+    path = tmp_path / "double_digit.pdf"
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "Quiz", fontsize=14)
+    page.insert_text((72, 100), "Question 1: First item", fontsize=12)
+    page.insert_text((72, 120), "Question 10: Tenth item body", fontsize=12)
+    doc.save(str(path))
+    doc.close()
+    return path
+
+
+@pytest.fixture
+def tmp_pdf_question_multiline(tmp_path):
+    """Question 1: spans two visual lines (continuation merged into Q1)."""
+    path = tmp_path / "multiline.pdf"
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "Sheet", fontsize=14)
+    page.insert_text((72, 100), "Question 1: Start of problem", fontsize=12)
+    page.insert_text((72, 120), "continuation line without question prefix", fontsize=12)
+    page.insert_text((72, 140), "Question 2: Second problem", fontsize=12)
+    doc.save(str(path))
+    doc.close()
+    return path
+
+
+@pytest.fixture
+def tmp_pdf_numbered_with_continuation(tmp_path):
+    """Numbered 1. / 2. with a continuation line absorbed into question 1."""
+    path = tmp_path / "numbered_continue.pdf"
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "Worksheet B", fontsize=14)
+    page.insert_text((72, 100), "1. Alpha prompt", fontsize=12)
+    page.insert_text((72, 120), "Extra detail for item one", fontsize=12)
+    page.insert_text((72, 140), "2. Beta prompt", fontsize=12)
+    doc.save(str(path))
+    doc.close()
+    return path
