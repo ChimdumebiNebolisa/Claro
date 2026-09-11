@@ -3,7 +3,7 @@
 - **As of:** 2026-09-11
 - **Branch:** `codex/claros-v2-nerdy`
 - **Baseline:** `5fb217715e4b3278f21a882b2652d928f2cca628`
-- **Current phase:** Gate 4 ready — Gate 3 is passed; OpenPDF renderer promotion is under verification
+- **Current phase:** Gate 4 ready — Gate 3 is passed; OpenPDF renderer promotion is verified locally
 - **Gate state:** Gates 0–3 passed; Windows Docker Desktop remains optional
 - **Gate 0 content checkpoint:** `0c15404b87edbbe19b03de93d81ad95aa1e897fd`
 - **Gate 1 content checkpoint:** `59cbc509650cc4a65b139a7db23012ead74efb3c`
@@ -20,7 +20,10 @@
 - **Promotion verification:** Focused real-endpoint and failure-path tests pass
   locally with Java 21.0.10, OpenPDF 3.0.5, PDFBox 3.0.8, qpdf 12.3.2, and the
   allowlisted Noto Sans Regular font. Clean-worktree, real-browser, sample PDF,
-  and final checkpoint evidence are pending until task 3.11 is closed.
+  PDF.js release compatibility, resource timing, and failure-injection evidence
+  are recorded in `artifacts/v2/openpdf-migration/verification.md`. Task 3.11 is
+  complete; Docker/production activation remains separately blocked and
+  unauthorized.
 
 - **Milestone:** Gate 3 passed at accepted clean checkpoint `88cda66`.
 - **Changed:** Added the FastAPI `/api/v2` service, signed anonymous ownership,
