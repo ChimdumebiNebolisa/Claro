@@ -27,6 +27,9 @@ assignments, and evidence from the running product rather than mockups.
 - Export a derivative from immutable source bytes and current confirmed
   answers, including partial assignments, exact Unicode, and validated
   appendix pages where needed.
+- Promote the validated OpenPDF renderer behind explicit engine selection, a
+  bounded Java process boundary, and mandatory qpdf plus PDFBox publication
+  gates; retain PDF.js as CI/release compatibility evidence only.
 - Add signed anonymous access, optimistic concurrency, idempotent confirmation
   and export, Realtime WebRTC credentials, security/privacy boundaries, a gold
   PDF corpus, and browser/PDF/accessibility evidence gates.
@@ -61,7 +64,8 @@ remain new deltas within this active change.
 
 - Rebuilds the V2 route hierarchy while preserving the current app under
   `/legacy` until the Gate 6 cutover.
-- Introduces FastAPI, GCS, the Python PDF stack, OpenAI Responses, OpenAI
+- Introduces FastAPI, GCS, the Python analysis/geometry stack, the maintained
+  Java 21/OpenPDF worker, qpdf and PDFBox validators, OpenAI Responses, OpenAI
   Realtime, Untitled UI React, EmbedPDF, TanStack Query, Motion, MSW, and
   generated OpenAPI client contracts.
 - Replaces sample-hash admission, client-coordinated placement, ASCII export,

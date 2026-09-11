@@ -171,8 +171,8 @@ Canonical display coordinates are crop-relative top-left integer milli-points.
 Stable block IDs derive from document/page/type/order/content/box evidence.
 Text blocks carry explicit `join_after: none|space|newline`; exact question text
 is reconstructed by code from selected blocks in physical order. Rendering
-adapters alone convert to PDF/ReportLab bottom-left coordinates through tested
-affine transforms.
+adapters alone convert canonical geometry into renderer-specific PDF
+bottom-left coordinates through tested affine transforms.
 
 OpenAI Responses receives stable IDs, exact text, kind, page, order, and bounded
 deterministic relation hints. It returns strict structured question mappings
@@ -203,12 +203,24 @@ fail before confirmation. Never truncate, normalize, paraphrase, white out, or
 overwrite source content.
 
 Export reloads the immutable source generation, current confirmed answers, and
-their evidence; revalidates all hashes and placements; clones source pages;
-merges ReportLab inline overlays; appends paginated answer pages; and validates
-openability, source-page count/order, exact text, bounds, and minimum size using
-pikepdf/pypdf plus parser checks. Each appendix entry contains worksheet title,
-question number/stable ID, exact source question, source page, and exact answer.
-Failure preserves assignment state and produces no published derivative.
+their evidence and revalidates every hash and placement before invoking the
+selected renderer. `CLAROS_PDF_ENGINE=current|openpdf` is explicit; `current`
+remains the deployment default until a separately authorized production
+selection. Selecting `openpdf` verifies Java 21+, the shaded worker JAR, the
+allowlisted Noto Sans font, and qpdf during application startup. Missing
+dependencies fail startup, and there is no silent renderer fallback.
+
+The OpenPDF renderer runs as a bounded child process, incrementally stamps
+validated inline lines onto immutable source pages, and appends paginated answer
+pages. Its strict versioned contract contains only server-derived source,
+physical-IR, exact-text, placement, font, and resource-limit evidence. Output
+remains quarantined until qpdf structural validation and an independent PDFBox
+validator prove page rendering, source preservation, placements, and generated
+text. PDF.js renders and extracts a representative output in the CI/release
+compatibility job only; it is not on the synchronous publication path. Each
+appendix entry contains worksheet title, question number/stable ID, exact source
+question, source page, and exact answer. Any worker, timeout, validator, or
+resource failure preserves confirmed state and publishes no derivative.
 
 ### 8. Constrain Realtime to assistance, never authority
 

@@ -8,6 +8,7 @@ coverage/
 !.env.example
 gha-creds-*.json
 .venv/
+.local/
 *.pyc
 __pycache__/
 .pytest_cache/

@@ -132,6 +132,7 @@ from backend.domain import (
     StudentEditInteraction as DomainStudentEditInteraction,
 )
 from backend.domain.identifiers import new_identifier
+from backend.openpdf import OpenPdfRuntime, select_pdf_engine
 from backend.rate_limit import RateLimitExceeded, SlidingWindowRateLimiter
 from backend.security import (
     AssignmentAccessDenied,
@@ -1688,7 +1689,26 @@ def build_assignment_service(settings: Settings) -> AssignmentApplicationService
         store = GCSObjectStore(cast(str, settings.gcs_bucket))
     else:
         store = LocalObjectStore(settings.local_storage_path)
-    return AssignmentApplicationService(settings=settings, store=store)
+    current_engine = DocumentProcessExecutor()
+    document_executor = select_pdf_engine(
+        current_engine,
+        engine=settings.pdf_engine,
+        runtime=OpenPdfRuntime(
+            jar_path=settings.openpdf_jar_path,
+            font_root=settings.openpdf_font_root,
+            qpdf_path=settings.openpdf_qpdf_path,
+            java_command=settings.openpdf_java_command,
+            max_input_bytes=settings.max_upload_bytes,
+            max_output_bytes=settings.openpdf_max_output_bytes,
+            max_pages=settings.max_pages,
+            jvm_heap_mib=settings.openpdf_jvm_heap_mib,
+        ),
+    )
+    return AssignmentApplicationService(
+        settings=settings,
+        store=store,
+        document_executor=document_executor,  # type: ignore[arg-type]
+    )
 
 
 def _question_evidence(question: QuestionState) -> QuestionEvidence:

@@ -24,10 +24,21 @@ def test_dockerfile_has_reproducible_two_stage_least_privilege_runtime() -> None
         "FROM python:3.11.16-slim-bookworm@sha256:"
         "528257d48c1da0dcecc2e725d1ae34498d60c965f1241e39cd6a85a8859bdf84 AS runtime" in dockerfile
     )
+    assert (
+        "FROM maven:3.9.11-eclipse-temurin-21@sha256:"
+        "6fdc855a6ed81d288ca7ca37ac6ff5e9308b612485c0801d70b25a858c83d237 AS openpdf-build"
+        in dockerfile
+    )
     assert "npm ci --no-audit --no-fund" in dockerfile
     assert "RUN npm run build" in dockerfile
     assert "python -m pip install --require-hashes --only-binary=:all:" in dockerfile
     assert "COPY --from=web-build" in dockerfile
+    assert (
+        "apt-get install --yes --no-install-recommends fontconfig libfreetype6 qpdf" in dockerfile
+    )
+    assert "COPY --from=openpdf-build --chown=0:0 /opt/java/openjdk /opt/java/openjdk" in dockerfile
+    assert "claros-openpdf-worker-0.1.0-SNAPSHOT-all.jar" in dockerfile
+    assert "CLAROS_PDF_ENGINE=openpdf" not in dockerfile
     assert "PYTHONPATH=/app" in dockerfile
     assert "USER 10001:10001" in dockerfile
     assert 'ENTRYPOINT ["python", "scripts/gate3-container-entrypoint.py"]' in dockerfile
@@ -48,11 +59,13 @@ def test_docker_context_excludes_local_secrets_and_generated_state() -> None:
         ".env",
         ".env.*",
         ".venv",
+        ".local",
         "node_modules",
         "dist",
         "gha-creds-*.json",
     } <= ignored
     assert {"private-pdfs", "local-corpus", "provider-cache", "artifacts"} <= ignored
+    assert "workers/openpdf/target" in ignored
 
 
 def test_remote_cloud_build_uses_pinned_buildkit_without_credentials() -> None:
@@ -102,6 +115,7 @@ def test_cloud_run_template_freezes_the_p0_envelope_and_secret_boundaries() -> N
     assert service.count("path: /health") == 2
     assert "name: CLAROS_ENVIRONMENT\n              value: production" in service
     assert "name: CLAROS_STORAGE_BACKEND\n              value: gcs" in service
+    assert "name: CLAROS_PDF_ENGINE\n              value: current" in service
     assert "name: claros-cookie-secret" in service
     assert "name: claros-review-token-secret" in service
     assert "name: claros-openai-api-key" in service

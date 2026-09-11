@@ -48,6 +48,7 @@ tmp-ocr
 .playwright-cli
 .vercel
 backend/tests
+workers/openpdf/target
 scripts/*
 !scripts/gate3-container-entrypoint.py
 *.md

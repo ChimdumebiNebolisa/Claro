@@ -50,6 +50,8 @@ spec:
               value: production
             - name: CLAROS_STORAGE_BACKEND
               value: gcs
+            - name: CLAROS_PDF_ENGINE
+              value: current
             - name: CLAROS_GCS_BUCKET
               value: "{{GCS_BUCKET}}"
             - name: CLAROS_PUBLIC_ORIGIN

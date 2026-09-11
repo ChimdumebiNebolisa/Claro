@@ -16,6 +16,19 @@ COPY tests ./tests
 RUN npm run build
 
 
+FROM maven:3.9.11-eclipse-temurin-21@sha256:6fdc855a6ed81d288ca7ca37ac6ff5e9308b612485c0801d70b25a858c83d237 AS openpdf-build
+
+WORKDIR /build
+
+COPY workers/openpdf/pom.xml ./pom.xml
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -q dependency:go-offline
+
+COPY workers/openpdf/src ./src
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -q package -DskipTests
+
+
 FROM python:3.11.16-slim-bookworm@sha256:528257d48c1da0dcecc2e725d1ae34498d60c965f1241e39cd6a85a8859bdf84 AS runtime
 
 ARG VCS_REF="unknown"
@@ -35,13 +48,19 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PORT=8080 \
     CLAROS_ENVIRONMENT=production \
-    CLAROS_STORAGE_BACKEND=gcs
+    CLAROS_STORAGE_BACKEND=gcs \
+    JAVA_HOME=/opt/java/openjdk \
+    PATH="/opt/java/openjdk/bin:${PATH}"
 
 WORKDIR /app
 
 RUN groupadd --gid 10001 claros \
     && useradd --uid 10001 --gid 10001 --no-create-home \
         --home-dir /nonexistent --shell /usr/sbin/nologin claros
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends fontconfig libfreetype6 qpdf \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY requirements-server.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip \
@@ -52,6 +71,10 @@ COPY --chown=0:0 backend ./backend
 COPY --chown=0:0 assets ./assets
 COPY --chown=0:0 public ./public
 COPY --chown=0:0 scripts/gate3-container-entrypoint.py ./scripts/gate3-container-entrypoint.py
+COPY --from=openpdf-build --chown=0:0 /opt/java/openjdk /opt/java/openjdk
+COPY --from=openpdf-build --chown=0:0 \
+    /build/target/claros-openpdf-worker-0.1.0-SNAPSHOT-all.jar \
+    ./workers/openpdf/target/claros-openpdf-worker-0.1.0-SNAPSHOT-all.jar
 COPY --from=web-build --chown=0:0 /build/dist ./dist
 
 USER 10001:10001

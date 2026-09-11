@@ -418,6 +418,31 @@ checkpoint has the exact tracked tree of the verified pre-scrub head, and both
 GitGuardian and the Ubuntu container workflow pass on the re-baselined pull
 request without weakening secret detection.
 
+### D-028 — OpenPDF renderer promotion without production activation
+
+The owner-directed 2026-09-11 migration supersedes D-016 and D-017 only for
+the export rendering and final validation implementation. Python continues to
+own preflight, physical IR, question grounding, deterministic fitting, placement
+hashes, immutable object publication, and application state. The selected
+OpenPDF path replaces ReportLab/pypdf rendering with a strict Java 21 child
+process using OpenPDF 3.0.5, Apache FOP 2.11, PDFBox 3.0.8, Jackson 2.20.0, and
+the existing allowlisted Noto Sans Regular font.
+
+`CLAROS_PDF_ENGINE` accepts only `current` or `openpdf`. Selection is made once
+at application construction; selecting OpenPDF verifies Java 21+, the shaded
+worker JAR, the font checksum, and qpdf before serving requests. There is no
+automatic fallback. `current` remains the configuration and Cloud Run template
+default because this work does not authorize a deployment or production
+activation.
+
+OpenPDF output is quarantined and cannot reach storage until qpdf succeeds and
+the independent PDFBox process proves generated text, source preservation,
+placement evidence, page counts, and renderability. Worker crashes, deadline
+expiry, malformed status, output bounds, or either validator failure delete the
+job directory, preserve confirmed answers, and publish nothing. PDF.js remains
+a CI/release compatibility renderer and is intentionally absent from the
+synchronous application request.
+
 ## Dependency plan
 
 The lead alone edits dependency manifests and lockfiles. Pin current compatible
@@ -452,7 +477,9 @@ runtime dependency.
 
 Runtime Python dependencies: FastAPI, Uvicorn, Pydantic Settings,
 `python-multipart`, `itsdangerous`, Google Cloud Storage, pikepdf, pdfplumber,
-ReportLab, pypdf, and the OpenAI Python client. Development dependencies:
+ReportLab, pypdf, and the OpenAI Python client. The maintained alternative
+exporter adds a Java 21 shaded worker with OpenPDF/PDFBox dependencies plus a
+separate qpdf executable; it reuses the vendored Noto Sans font. Development dependencies:
 pytest, pytest-asyncio, HTTPX, coverage, Ruff, and pip-audit. Use pinned
 `requirements-server.txt` and `requirements-dev.txt` plus `pyproject.toml`
 tool configuration, matching the repository’s historical packaging approach.

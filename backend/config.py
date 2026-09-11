@@ -16,6 +16,7 @@ MAX_ORIGIN_LENGTH = 512
 MIN_PRODUCTION_SECRET_BYTES = 32
 MIN_PRODUCTION_SECRET_UNIQUE_BYTES = 8
 _HOST_LABEL = re.compile(r"^(?!-)[a-z0-9-]{1,63}(?<!-)$", re.IGNORECASE)
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 
 @dataclass(frozen=True)
@@ -122,6 +123,26 @@ class Settings(BaseSettings):
     upload_rate_window_seconds: int = Field(default=3_600, ge=1, le=86_400)
     realtime_rate_limit: int = Field(default=20, ge=1, le=1_000)
     realtime_rate_window_seconds: int = Field(default=60, ge=1, le=3_600)
+    pdf_engine: Literal["current", "openpdf"] = "current"
+    openpdf_jar_path: Path = (
+        _REPOSITORY_ROOT
+        / "workers"
+        / "openpdf"
+        / "target"
+        / "claros-openpdf-worker-0.1.0-SNAPSHOT-all.jar"
+    )
+    openpdf_font_root: Path = _REPOSITORY_ROOT / "assets" / "fonts" / "noto-sans"
+    openpdf_qpdf_path: Path | None = None
+    openpdf_java_command: str = "java"
+    openpdf_jvm_heap_mib: int = Field(default=192, ge=32, le=1_024)
+    openpdf_max_output_bytes: int = Field(default=64 * 1024 * 1024, ge=1)
+
+    @field_validator("openpdf_java_command")
+    @classmethod
+    def validate_openpdf_java_command(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("OpenPDF Java command cannot be empty")
+        return value
 
     @field_validator("public_origin")
     @classmethod

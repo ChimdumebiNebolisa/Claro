@@ -10,6 +10,7 @@
     "dev": "vite",
     "dev:api": "node server/index.mjs",
     "build": "tsc -b && vite build",
+    "build:openpdf": "mvn -q -f workers/openpdf/pom.xml package -DskipTests",
     "format": "prettier --check src/v2 src/main.tsx src/styles/tailwind.css src/styles/v2.css \"tests/gate*.test.ts*\" tests/e2e tests/storybook .storybook scripts playwright.config.ts playwright.storybook.config.ts vite.config.ts vitest.config.ts components.json eslint.config.js package.json tsconfig.json",
     "lint": "eslint src/v2 src/main.tsx tests .storybook --max-warnings=0",
     "typecheck": "tsc -b --pretty false",
