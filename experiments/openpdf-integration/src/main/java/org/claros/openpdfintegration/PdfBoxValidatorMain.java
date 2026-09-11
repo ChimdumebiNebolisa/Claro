@@ -75,6 +75,9 @@ public final class PdfBoxValidatorMain {
     }
 
     private static void validate(Path root) throws Exception {
+        long validationStarted = System.nanoTime();
+        Map<String, Double> timings = new LinkedHashMap<>();
+        long phaseStarted = validationStarted;
         ContractSupport.Job job;
         try {
             job = ContractSupport.readJob(root.resolve("job.json"));
@@ -89,8 +92,17 @@ public final class PdfBoxValidatorMain {
         if (Files.size(derivativePath) > job.limits().maxOutputBytes()) {
             throw new ValidationFailure("resource_limit");
         }
-        try (PDDocument source = Loader.loadPDF(sourcePath.toFile());
-             PDDocument derivative = Loader.loadPDF(derivativePath.toFile())) {
+        phaseStarted = record(timings, "contract_and_limits_ms", phaseStarted);
+        PDDocument source = Loader.loadPDF(sourcePath.toFile());
+        PDDocument derivative;
+        try {
+            derivative = Loader.loadPDF(derivativePath.toFile());
+        } catch (Exception error) {
+            source.close();
+            throw error;
+        }
+        phaseStarted = record(timings, "pdf_reopen_ms", phaseStarted);
+        try (source; derivative) {
             int sourcePages = source.getNumberOfPages();
             int outputPages = derivative.getNumberOfPages();
             if (sourcePages != job.source().pageCount() || outputPages < sourcePages
@@ -102,13 +114,28 @@ public final class PdfBoxValidatorMain {
             if (!sameSourceSemantics(before, after)) {
                 throw new ValidationFailure("source_semantics");
             }
+            phaseStarted = record(timings, "semantic_preservation_ms", phaseStarted);
             verifySourceContentStreams(source, derivative);
-            verifySourceText(source, derivative);
+            phaseStarted = record(timings, "source_streams_ms", phaseStarted);
+            List<String> sourceText = pageText(source);
+            List<String> derivativeText = pageText(derivative);
+            phaseStarted = record(timings, "text_extraction_ms", phaseStarted);
+            verifySourceText(sourceText, derivativeText);
             verifyGeometry(job, source, derivative);
-            verifyGeneratedTextAndPlacement(job, source, derivative);
-            verifyContinuation(job, derivative, sourcePages);
+            phaseStarted = record(timings, "page_geometry_ms", phaseStarted);
+            Map<Integer, List<ContractSupport.Line>> inlineLines = inlineLines(job);
+            Map<Integer, GeneratedPageText> generatedPages = generatedPages(
+                    inlineLines, source, derivative);
+            phaseStarted = record(timings, "generated_text_extraction_ms", phaseStarted);
+            verifyGeneratedText(inlineLines, generatedPages);
+            verifyPlacement(inlineLines, generatedPages);
+            phaseStarted = record(timings, "coordinates_ms", phaseStarted);
+            verifyContinuation(job, derivativeText, sourcePages);
+            phaseStarted = record(timings, "continuation_ms", phaseStarted);
             renderAllPages(derivative);
+            phaseStarted = record(timings, "rendering_ms", phaseStarted);
             write(root, true, null, job.jobId(), outputPages);
+            writeProfile(root, timings, elapsedMillis(validationStarted));
         } catch (ValidationFailure error) {
             throw error;
         } catch (Exception error) {
@@ -185,10 +212,8 @@ public final class PdfBoxValidatorMain {
         return result;
     }
 
-    private static void verifySourceText(PDDocument source, PDDocument output)
-            throws IOException, ValidationFailure {
-        List<String> expected = pageText(source);
-        List<String> actual = pageText(output);
+    private static void verifySourceText(List<String> expected, List<String> actual)
+            throws ValidationFailure {
         for (int index = 0; index < expected.size(); index++) {
             if (!runsInOrder(expected.get(index), actual.get(index))) {
                 throw new ValidationFailure("source_text");
@@ -196,9 +221,7 @@ public final class PdfBoxValidatorMain {
         }
     }
 
-    private static void verifyGeneratedTextAndPlacement(
-            ContractSupport.Job job, PDDocument source, PDDocument output)
-            throws IOException, ValidationFailure {
+    private static Map<Integer, List<ContractSupport.Line>> inlineLines(ContractSupport.Job job) {
         Map<Integer, List<ContractSupport.Line>> expectedByPage = new HashMap<>();
         for (ContractSupport.Answer answer : job.answers()) {
             if (answer.classification().equals("inline")) {
@@ -206,16 +229,39 @@ public final class PdfBoxValidatorMain {
                         .addAll(answer.lines());
             }
         }
+        return expectedByPage;
+    }
+
+    private static Map<Integer, GeneratedPageText> generatedPages(
+            Map<Integer, List<ContractSupport.Line>> expectedByPage,
+            PDDocument source, PDDocument output) throws IOException {
+        Map<Integer, GeneratedPageText> result = new HashMap<>();
         for (Map.Entry<Integer, List<ContractSupport.Line>> entry : expectedByPage.entrySet()) {
             int pageIndex = entry.getKey();
-            GeneratedPageText page = generatedPageText(
-                    source.getPage(pageIndex), output.getPage(pageIndex), output, pageIndex + 1);
+            result.put(pageIndex, generatedPageText(
+                    source.getPage(pageIndex), output.getPage(pageIndex), output, pageIndex + 1));
+        }
+        return result;
+    }
+
+    private static void verifyGeneratedText(
+            Map<Integer, List<ContractSupport.Line>> expectedByPage,
+            Map<Integer, GeneratedPageText> generatedPages) throws ValidationFailure {
+        for (Map.Entry<Integer, List<ContractSupport.Line>> entry : expectedByPage.entrySet()) {
             String expected = entry.getValue().stream()
                     .map(ContractSupport.Line::text)
                     .collect(java.util.stream.Collectors.joining());
-            if (!page.characters().equals(expected)) {
+            if (!generatedPages.get(entry.getKey()).characters().equals(expected)) {
                 throw new ValidationFailure("generated_text_exact");
             }
+        }
+    }
+
+    private static void verifyPlacement(
+            Map<Integer, List<ContractSupport.Line>> expectedByPage,
+            Map<Integer, GeneratedPageText> generatedPages) throws ValidationFailure {
+        for (Map.Entry<Integer, List<ContractSupport.Line>> entry : expectedByPage.entrySet()) {
+            GeneratedPageText page = generatedPages.get(entry.getKey());
             int offset = 0;
             for (ContractSupport.Line line : entry.getValue()) {
                 if (line.text().isEmpty()) {
@@ -271,21 +317,20 @@ public final class PdfBoxValidatorMain {
     }
 
     private static void verifyContinuation(
-            ContractSupport.Job job, PDDocument output, int sourcePages)
-            throws IOException, ValidationFailure {
+            ContractSupport.Job job, List<String> text, int sourcePages)
+            throws ValidationFailure {
         List<ContractSupport.Answer> appendices = job.answers().stream()
                 .filter(answer -> answer.classification().equals("appendix"))
                 .toList();
         if (appendices.isEmpty()) {
-            if (output.getNumberOfPages() != sourcePages) {
+            if (text.size() != sourcePages) {
                 throw new ValidationFailure("continuation_order");
             }
             return;
         }
-        if (output.getNumberOfPages() <= sourcePages) {
+        if (text.size() <= sourcePages) {
             throw new ValidationFailure("continuation_order");
         }
-        List<String> text = pageText(output);
         String continuationText = String.join("\n", text.subList(sourcePages, text.size()));
         int cursor = 0;
         for (ContractSupport.Answer answer : appendices) {
@@ -298,7 +343,7 @@ public final class PdfBoxValidatorMain {
             }
             cursor = identifier + answer.displayIdentifier().length();
         }
-        for (int page = sourcePages + 1; page <= output.getNumberOfPages(); page++) {
+        for (int page = sourcePages + 1; page <= text.size(); page++) {
             String expected = "Attached answer page " + (page - sourcePages);
             if (!text.get(page - 1).contains(expected)) {
                 throw new ValidationFailure("continuation_numbering");
@@ -529,6 +574,30 @@ public final class PdfBoxValidatorMain {
                     ContractSupport.MAPPER.writeValueAsBytes(status));
         } catch (IOException ignored) {
             // Missing status is also a closed validation failure.
+        }
+    }
+
+    private static long record(Map<String, Double> timings, String name, long started) {
+        long now = System.nanoTime();
+        timings.put(name, (now - started) / 1_000_000.0);
+        return now;
+    }
+
+    private static double elapsedMillis(long started) {
+        return (System.nanoTime() - started) / 1_000_000.0;
+    }
+
+    private static void writeProfile(Path root, Map<String, Double> timings, double totalMillis) {
+        try {
+            ObjectNode profile = ContractSupport.MAPPER.createObjectNode();
+            profile.put("schema_version", 1);
+            ObjectNode phases = profile.putObject("phases_ms");
+            timings.forEach(phases::put);
+            profile.put("validator_internal_total_ms", totalMillis);
+            Files.write(root.resolve("pdfbox-profile.json"),
+                    ContractSupport.MAPPER.writeValueAsBytes(profile));
+        } catch (IOException ignored) {
+            // Profiling evidence is non-authoritative and never affects validation.
         }
     }
 
