@@ -128,7 +128,7 @@ def test_openpdf_selection_fails_startup_with_clear_dependency_diagnostics(
 
 
 @pytest.mark.anyio
-async def test_source_placement_evidence_and_rtl_fail_closed_before_worker_launch(
+async def test_source_placement_and_unsupported_input_fail_closed_before_worker_launch(
     tmp_path: Path,
 ) -> None:
     source, physical_ir, answer = _answer()
@@ -142,6 +142,7 @@ async def test_source_placement_evidence_and_rtl_fail_closed_before_worker_launc
             "placement_changed",
         ),
         (source, physical_ir, replace(answer, exact_text="مرحبا"), "unsupported_rtl"),
+        (source, physical_ir, replace(answer, exact_text="😀"), "unsupported_glyph"),
     )
 
     for source_value, ir_value, answer_value, code in cases:
