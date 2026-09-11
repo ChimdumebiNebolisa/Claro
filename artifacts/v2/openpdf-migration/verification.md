@@ -3,6 +3,7 @@
 - **Date:** 2026-09-11
 - **Branch:** `codex/claros-v2-nerdy`
 - **Implementation checkpoint:** `18816eccaf19113d773555174168e42b6386162b`
+- **Dependency/container checkpoint:** `49583cb1b6216193ba4e19b1e9ea96d66986ced4`
 - **Production activation:** Not performed; `current` remains the explicit Cloud Run template default.
 
 ## Runtime and packaging
@@ -34,6 +35,8 @@ Java, the shaded worker, font support, and qpdf, but does not select OpenPDF.
 | Ruff | Format check and lint passed |
 | OpenSpec | `openspec validate claros-reconstruction --strict` passed |
 | Clean worktree | Fresh `npm ci`, `npm run build`, Maven package, Ruff, OpenSpec, and 24 OpenPDF/container checks passed at `18816ec`; worktree stayed clean |
+| Jackson remediation | Maven resolved Jackson Databind/Core 2.21.6 and Annotations 2.21; the unchanged HIGH/CRITICAL Trivy vulnerability, secret, and misconfiguration gate reported zero findings from a clean checkout |
+| Docker/OpenPDF smoke | [GitHub Actions run 34578668504](https://github.com/ChimdumebiNebolisa/Claros/actions/runs/34578668504) passed at `49583cb`: image build, OpenPDF-selected inline and appendix exports, derivative reopen, non-root runtime, restart persistence, ownership isolation, and privacy-safe logs |
 
 The full frontend gate ran on the available Node 24.14.1 host. The fresh clean
 install reported the expected engine warning because the repository requires
@@ -90,17 +93,30 @@ each with one inline answer and an 80-sentence appendix answer:
 These are local development-host observations, not production capacity or SLO
 claims. The synchronous validation time is reported separately from rendering.
 
-## Remaining deployment blocker
+## Container evidence and local host limitation
 
-The local Docker client is present, but its Linux daemon is unavailable:
+The Docker-enabled GitHub Actions gate built
+`claros-v2:gate3-49583cb1b6216193ba4e19b1e9ea96d66986ced4` and ran the
+existing full-flow smoke with `CLAROS_PDF_ENGINE=openpdf`. It created two
+assignments and validated both placement outcomes. The reopened outputs were:
+
+| Placement | Pages | SHA-256 |
+| --- | ---: | --- |
+| Inline | 1 | `8fd8b5f4ac563aa2cd2d11af4f6c38febb2ca64c3977f52766cbba68e88913f9` |
+| Appendix | 2 | `eb1ed518aabad6f5b043db438ec724897d30f47ac5d545a38aab75d62cc41763` |
+
+The same run passed the promoted endpoint/PDF.js compatibility job and the
+unchanged Trivy gate. Its smoke evidence also reported `health: ok`, fixed UID
+`10001`, restart persistence, ownership isolation, and privacy-safe logs.
+
+The Windows workstation's Docker Desktop 4.54.0 backend remains locally
+unavailable because an optional inference-service socket cannot be removed:
 
 ```text
-failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine:
-The system cannot find the file specified.
+initializing Inference manager: listening on ...\Docker\run\dockerInference:
+remove ...\Docker\run\dockerInference: The file cannot be accessed by the system.
 ```
 
-Therefore no local container-runtime or deployment claim is made. The
-dispatchable Ubuntu workflow now builds the packaged worker and runs the real
-endpoint plus PDF.js compatibility suite on pull requests, `main`, or manual
-dispatch. Production engine activation and deployment remain separately
-authorized work.
+This host fault does not qualify as local container evidence; the successful
+Docker-enabled Actions run is the container build/export evidence. Production
+engine activation and deployment remain separately authorized work.
