@@ -1,0 +1,4 @@
+*.pdf binary
+/CLAROS_V2_SOL_ULTRA_EXECUTION_PRD.md -text
+/CLAROS_V2_PRODUCT_CONTRACT.md -text
+/CLAROS_V2_DESIGN.md -text

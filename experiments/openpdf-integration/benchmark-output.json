@@ -1,0 +1,110 @@
+{
+  "environment": {
+    "platform": "Windows-10-10.0.26200-SP0",
+    "python": "3.11.9",
+    "note": "Developer-workstation evidence; not a production throughput claim."
+  },
+  "concurrency": {
+    "1": {
+      "jobs": 1,
+      "wall_ms": 9194,
+      "mean": {
+        "total_ms": 9194,
+        "worker_process_ms": 1781,
+        "worker_internal_render_ms": 1333,
+        "cold_start_overhead_ms": 448,
+        "validation_ms": 6781,
+        "qpdf_ms": 109,
+        "pdfbox_ms": 2797,
+        "pdfjs_ms": 3875,
+        "peak_worker_rss_bytes": 75149312,
+        "output_bytes": 14860,
+        "temporary_peak_bytes": 18477,
+        "cleanup_ms": 31
+      },
+      "max": {
+        "total_ms": 9194,
+        "worker_process_ms": 1781,
+        "worker_internal_render_ms": 1333,
+        "cold_start_overhead_ms": 448,
+        "validation_ms": 6781,
+        "qpdf_ms": 109,
+        "pdfbox_ms": 2797,
+        "pdfjs_ms": 3875,
+        "peak_worker_rss_bytes": 75149312,
+        "output_bytes": 14860,
+        "temporary_peak_bytes": 18477,
+        "cleanup_ms": 31
+      },
+      "batch_wall_ms": 9325
+    },
+    "5": {
+      "jobs": 5,
+      "wall_ms": 19472,
+      "mean": {
+        "total_ms": 18634,
+        "worker_process_ms": 2341,
+        "worker_internal_render_ms": 1783,
+        "cold_start_overhead_ms": 557,
+        "validation_ms": 15063,
+        "qpdf_ms": 228,
+        "pdfbox_ms": 9481,
+        "pdfjs_ms": 5353,
+        "peak_worker_rss_bytes": 74382541,
+        "output_bytes": 14860,
+        "temporary_peak_bytes": 18477,
+        "cleanup_ms": 85
+      },
+      "max": {
+        "total_ms": 19472,
+        "worker_process_ms": 2359,
+        "worker_internal_render_ms": 1797,
+        "cold_start_overhead_ms": 586,
+        "validation_ms": 15797,
+        "qpdf_ms": 266,
+        "pdfbox_ms": 9672,
+        "pdfjs_ms": 6141,
+        "peak_worker_rss_bytes": 74711040,
+        "output_bytes": 14860,
+        "temporary_peak_bytes": 18477,
+        "cleanup_ms": 157
+      },
+      "batch_wall_ms": 19581
+    },
+    "10": {
+      "jobs": 10,
+      "wall_ms": 48936,
+      "mean": {
+        "total_ms": 46959,
+        "worker_process_ms": 4997,
+        "worker_internal_render_ms": 3941,
+        "cold_start_overhead_ms": 1056,
+        "validation_ms": 38520,
+        "qpdf_ms": 217,
+        "pdfbox_ms": 28406,
+        "pdfjs_ms": 9897,
+        "peak_worker_rss_bytes": 73510912,
+        "output_bytes": 14860,
+        "temporary_peak_bytes": 18477,
+        "cleanup_ms": 390
+      },
+      "max": {
+        "total_ms": 48936,
+        "worker_process_ms": 5812,
+        "worker_internal_render_ms": 4767,
+        "cold_start_overhead_ms": 1210,
+        "validation_ms": 40094,
+        "qpdf_ms": 328,
+        "pdfbox_ms": 28969,
+        "pdfjs_ms": 11062,
+        "peak_worker_rss_bytes": 74756096,
+        "output_bytes": 14860,
+        "temporary_peak_bytes": 18477,
+        "cleanup_ms": 828
+      },
+      "batch_wall_ms": 49100
+    }
+  },
+  "failure_path_ms": 610,
+  "failure_cleanup_ms": 15
+}

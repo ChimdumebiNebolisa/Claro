@@ -1,0 +1,119 @@
+name: Gate 3 container
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gate3-container-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  openpdf-release-compatibility:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.11.16"
+          cache: pip
+
+      - name: Set up Node 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22.22.0"
+          cache: npm
+
+      - name: Set up Java 21
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Install OpenPDF release-check dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends qpdf
+          python -m pip install --require-hashes --requirement requirements-dev.txt
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Exercise the promoted OpenPDF endpoint and PDF.js compatibility check
+        env:
+          CLAROS_PDFJS_RELEASE_CHECK: "1"
+        run: |
+          mvn -q -f workers/openpdf/pom.xml package -DskipTests
+          python -m pytest backend/tests/openpdf -q
+
+  container-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.11.16"
+          cache: pip
+
+      - name: Install hash-locked Python verification dependencies
+        run: python -m pip install --require-hashes --requirement requirements-dev.txt
+
+      - name: Check container scripts and contracts
+        run: |
+          python -m ruff check scripts/gate3-container-*.py backend/tests/container
+          python -m pytest backend/tests/container -q
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd
+        with:
+          terraform_version: "1.15.2"
+
+      - name: Validate deployment infrastructure
+        run: |
+          terraform fmt -check -recursive deploy/terraform
+          terraform -chdir=deploy/terraform init -backend=false -input=false -lockfile=readonly
+          terraform -chdir=deploy/terraform validate
+
+      - name: Scan source, lockfiles, secrets, and infrastructure
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1
+        with:
+          version: v0.69.3
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: false
+          skip-dirs: node_modules,.venv,.git
+
+      - name: Build and run the hardened full-flow smoke
+        id: container_smoke
+        run: |
+          python scripts/gate3-container-smoke.py \
+            --image claros-v2:gate3-${GITHUB_SHA} \
+            --artifact-dir artifacts/gate3-container-smoke
+
+      - name: Upload container logs and reopened exports
+        if: ${{ always() && steps.container_smoke.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: gate3-container-smoke-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/gate3-container-smoke
+          if-no-files-found: error
+          retention-days: 7

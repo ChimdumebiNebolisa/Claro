@@ -5,8 +5,25 @@ const meta = {
   title: "Claros/Answer states",
   component: StatePreview,
   parameters: { layout: "centered" },
+  decorators: [
+    (Story) => (
+      <div className="legacy-root">
+        <Story />
+      </div>
+    ),
+  ],
   argTypes: {
-    state: { control: "select", options: ["draft", "review", "blocked", "committed", "unsupported", "expired"] satisfies AnswerState[] },
+    state: {
+      control: "select",
+      options: [
+        "draft",
+        "review",
+        "blocked",
+        "committed",
+        "unsupported",
+        "expired",
+      ] satisfies AnswerState[],
+    },
   },
 } satisfies Meta<typeof StatePreview>;
 

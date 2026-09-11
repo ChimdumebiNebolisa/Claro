@@ -1,0 +1,48 @@
+.flow {
+  width: 100%;
+}
+
+.header {
+  max-width: 660px;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  color: var(--claros-blue-dark);
+  font-size: 13px;
+  font-weight: 720;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  color: var(--claros-ink);
+  font-size: clamp(28px, 3.2vw, 32px);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+  outline: none;
+}
+
+.description {
+  max-width: 610px;
+  margin: 18px 0 0;
+  color: var(--claros-muted);
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.panel {
+  margin-top: 32px;
+}
+
+@media (max-width: 767px) {
+  .eyebrow {
+    margin-bottom: 10px;
+  }
+
+  .panel {
+    margin-top: 26px;
+  }
+}

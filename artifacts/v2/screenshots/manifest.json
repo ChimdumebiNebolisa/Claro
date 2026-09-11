@@ -1,0 +1,189 @@
+{
+  "commit": "0723303ef718bb28594d519da31ec0a55226fa45",
+  "baseUrl": "http://127.0.0.1:5173",
+  "expectedStateMatrixCaptures": 33,
+  "totalCaptures": 36,
+  "externalRequests": [],
+  "captures": [
+    {
+      "file": "screenshots/upload-desktop.png",
+      "sha256": "06b2091558fc97a1bcaaae4b3dcc8de0aef31110d7b5328cb175609ed98284e7",
+      "bytes": 44407
+    },
+    {
+      "file": "screenshots/upload-mobile.png",
+      "sha256": "d784ee404bfb82b6b6113a301e5657d421e6541f164abfd0e60a021f5583a9d5",
+      "bytes": 35842
+    },
+    {
+      "file": "screenshots/checking-desktop.png",
+      "sha256": "d3f8e1728d0308d96bc1ef0c57e72934c4d9dea987df5058d8ddc5238d522f64",
+      "bytes": 35848
+    },
+    {
+      "file": "screenshots/checking-mobile.png",
+      "sha256": "55665749e58f44cd0ce2a399486b8bd1228a28b6c3be552a058463b0d04b1748",
+      "bytes": 28061
+    },
+    {
+      "file": "screenshots/ready-desktop.png",
+      "sha256": "fa648d602359cd45ae4e29076838568ad9b10eee03aa5e107e5e33c9388e5700",
+      "bytes": 83320
+    },
+    {
+      "file": "screenshots/ready-mobile.png",
+      "sha256": "58b43035138b8375f8efa41f9cf3a19680c2bcf8dcf66d02f492813c95302447",
+      "bytes": 52280
+    },
+    {
+      "file": "screenshots/question-choice-desktop.png",
+      "sha256": "2d627896d1be4d1c0b767b1bc825979f5e877b76d61eba4cfcfdb43241ee3700",
+      "bytes": 76779
+    },
+    {
+      "file": "screenshots/question-choice-mobile.png",
+      "sha256": "545767af852cbbd10d7502fba3f2984d0eaab0f84d0a6c3cfce4fde3e9d50ac3",
+      "bytes": 44392
+    },
+    {
+      "file": "screenshots/question-choice-tablet.png",
+      "sha256": "68ea0f1e28a78822e3cc60c6375af91dcf06ea02c650fefc8dfd557648a88b32",
+      "bytes": 91157
+    },
+    {
+      "file": "screenshots/direct-listening-desktop.png",
+      "sha256": "3ac6db68021884c4ed3c74fa04da9dad89557b2e8ffa406d7345a17494366282",
+      "bytes": 87621
+    },
+    {
+      "file": "screenshots/direct-listening-mobile.png",
+      "sha256": "da31cbe0ae8896bccb2cdf8002c3d6e132bbd150f6b99e10621c76726bc08c86",
+      "bytes": 44131
+    },
+    {
+      "file": "screenshots/direct-captured-desktop.png",
+      "sha256": "082b875673d183fccec719fcc8d7ba016dc76acb04e38eeea018b771064033c7",
+      "bytes": 90937
+    },
+    {
+      "file": "screenshots/direct-captured-mobile.png",
+      "sha256": "09f78d7fb7e8bc2d43704f3b7188f3ea1d83e5980a5b09469d3817cac0b63782",
+      "bytes": 45278
+    },
+    {
+      "file": "screenshots/guided-conversation-desktop.png",
+      "sha256": "e18d1af6c25d056a8a0ac08cf6a4ca1d6be3031fada8b695d0b0552a8e37f35a",
+      "bytes": 100942
+    },
+    {
+      "file": "screenshots/guided-conversation-mobile.png",
+      "sha256": "c546e1ebc914090807a6408280679fdf96e10381fe4200a402eeed4a0128e55a",
+      "bytes": 51185
+    },
+    {
+      "file": "screenshots/guided-conversation-tablet.png",
+      "sha256": "7314928562418dd830b3ab3334b17d0a5413232a11dbc3353d4dfada3f6384f4",
+      "bytes": 105633
+    },
+    {
+      "file": "screenshots/wording-comparison-desktop.png",
+      "sha256": "88c4f7db5d46e47508927a1e5ffcfcf21dfab40b1739054e1b45751f1818fdc6",
+      "bytes": 79553
+    },
+    {
+      "file": "screenshots/wording-comparison-mobile.png",
+      "sha256": "8a572f56d64eb6871305431f43f3e410ff3d618e6a4e7f0cd85b507d5bac4170",
+      "bytes": 55357
+    },
+    {
+      "file": "screenshots/exact-review-inline-desktop.png",
+      "sha256": "4ece39adf7d359985c3aed7c6c62a323c2dda6a466f08183c84c7c0cedd9e64b",
+      "bytes": 93689
+    },
+    {
+      "file": "screenshots/exact-review-inline-mobile.png",
+      "sha256": "5303f78544825ae5cadea359253e21a2ff19376761414f359d3aad68e2b30a66",
+      "bytes": 49187
+    },
+    {
+      "file": "screenshots/exact-review-appendix-desktop.png",
+      "sha256": "1dc3dadac5305fe63f1241ebc4700ef3fc99af03e9283b9d983138936b671b58",
+      "bytes": 105884
+    },
+    {
+      "file": "screenshots/exact-review-appendix-mobile.png",
+      "sha256": "81f6f76c04260bedc800eec3308e7d1f0525ad7aa632ee1cb7e6613a1cb4a81f",
+      "bytes": 51138
+    },
+    {
+      "file": "screenshots/answer-added-desktop.png",
+      "sha256": "712cafe845c20f28956e3e229ba7c60a097c54ad356fc183174f3271fe116e5a",
+      "bytes": 74226
+    },
+    {
+      "file": "screenshots/answer-added-mobile.png",
+      "sha256": "ce972338eaf7146d968a5d73a9cc642d89861299b0ba408687b6926ad5fa0641",
+      "bytes": 42228
+    },
+    {
+      "file": "screenshots/worksheet-review-desktop.png",
+      "sha256": "2bba953abe0415bde4c8bc51911b3b1493e128ea236fb7c7ce480ee9be65d919",
+      "bytes": 105075
+    },
+    {
+      "file": "screenshots/worksheet-review-mobile.png",
+      "sha256": "e7bdc868992b92a621acf21c0c128ea36fe92f87d926cb10af123a9e778e4621",
+      "bytes": 54241
+    },
+    {
+      "file": "screenshots/worksheet-review-tablet.png",
+      "sha256": "e85fb5b35accc076d91f11e3e8dced5522f321f7eb80ce5cda5724ac2235184f",
+      "bytes": 125875
+    },
+    {
+      "file": "screenshots/export-complete-desktop.png",
+      "sha256": "abdda5602d21a30a366bc4b7e89c06e394bb4a8a3f187c699dc253c840115423",
+      "bytes": 72303
+    },
+    {
+      "file": "screenshots/export-complete-mobile.png",
+      "sha256": "c83d0c1cec85213bdc2f5edaf69b66a32c43579f2d2d5164f1022dfd2acb4338",
+      "bytes": 39521
+    },
+    {
+      "file": "screenshots/unsupported-desktop.png",
+      "sha256": "cc724b64f0e95e3427028cb054f704bbc0d0bdcbea79a1568cf74e622c4e8f6b",
+      "bytes": 58307
+    },
+    {
+      "file": "screenshots/unsupported-mobile.png",
+      "sha256": "5c4bfdeec41e4efd6230893eee2b87ea0eacde5944d0dd441800c0e0a793ca70",
+      "bytes": 47744
+    },
+    {
+      "file": "screenshots/voice-unavailable-desktop.png",
+      "sha256": "09d254deeca56d9765e0662d60839d85532ac9c5c15be3cf0bb1bce39ca646c1",
+      "bytes": 91315
+    },
+    {
+      "file": "screenshots/voice-unavailable-mobile.png",
+      "sha256": "ddc35cb2a58b5c9a0a2749d822e292208d8e0527ad53e09162c916567e19a855",
+      "bytes": 45337
+    },
+    {
+      "file": "screenshots/marketing-desktop.png",
+      "sha256": "fc1aa6e7c80ac797de603936be03b9f67469812b4f7c9d43f3393d8aee85ad1c",
+      "bytes": 195697
+    },
+    {
+      "file": "screenshots/marketing-mobile.png",
+      "sha256": "beceef0f16d826ce1bef2fe06a04453559c181a172688f7341855c76a2ea0652",
+      "bytes": 168202
+    },
+    {
+      "file": "screenshots/worksheet-dialog-mobile.png",
+      "sha256": "705c6fecb27a045562f09469b47e7ab9cff2a2b76d0643ea7a824b379df73888",
+      "bytes": 30182
+    }
+  ]
+}

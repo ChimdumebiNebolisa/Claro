@@ -1,0 +1,315 @@
+name: Build, stage, and promote Claros
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      promote_to_production:
+        description: Promote the staging-tested image digest to production
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: claros-cloud-run-deploy
+  cancel-in-progress: false
+
+env:
+  IMAGE_REPOSITORY: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/cloud-run-source-deploy/claros
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    outputs:
+      image_uri: ${{ steps.immutable-image.outputs.image_uri }}
+
+    steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Authenticate to Google Cloud without a service-account key
+        id: google-auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          token_format: access_token
+
+      - name: Authenticate Docker to Artifact Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.google-auth.outputs.access_token }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+
+      - name: Scan source, secrets, and deployment configuration
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1
+        with:
+          version: v0.69.3
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: false
+          skip-dirs: node_modules,.venv,.git
+
+      - name: Capture reproducible build metadata
+        id: build-metadata
+        run: echo "created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+
+      - name: Build once and push with provenance and SBOM attestations
+        id: build-image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE_REPOSITORY }}:git-${{ github.sha }}-run-${{ github.run_id }}-${{ github.run_attempt }}
+          build-args: |
+            VCS_REF=${{ github.sha }}
+            BUILD_DATE=${{ steps.build-metadata.outputs.created }}
+            SOURCE_URL=${{ github.server_url }}/${{ github.repository }}
+          provenance: mode=max
+          sbom: true
+
+      - name: Freeze the image reference at its registry digest
+        id: immutable-image
+        env:
+          IMAGE_DIGEST: ${{ steps.build-image.outputs.digest }}
+        run: |
+          if [[ ! "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "Build did not return a valid image digest" >&2
+            exit 1
+          fi
+          echo "image_uri=${IMAGE_REPOSITORY}@${IMAGE_DIGEST}" >> "$GITHUB_OUTPUT"
+
+      - name: Scan the pushed image for high-severity runtime findings
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1
+        with:
+          version: v0.69.3
+          scan-type: image
+          image-ref: ${{ steps.immutable-image.outputs.image_uri }}
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: false
+
+      - name: Generate the release CycloneDX SBOM
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1
+        with:
+          version: v0.69.3
+          scan-type: image
+          image-ref: ${{ steps.immutable-image.outputs.image_uri }}
+          format: cyclonedx
+          output: claros-v2-sbom.cdx.json
+          exit-code: "0"
+
+      - name: Upload immutable-build evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: claros-v2-sbom-${{ github.sha }}
+          path: claros-v2-sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 30
+
+  staging:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: staging
+
+    steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.11.16"
+
+      - name: Authenticate to Google Cloud without a service-account key
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db
+
+      - name: Deploy, replace the revision, and verify GCS persistence
+        env:
+          IMAGE_URI: ${{ needs.build.outputs.image_uri }}
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          REGION: ${{ vars.GCP_REGION }}
+          SERVICE_NAME: ${{ vars.CLAROS_STAGING_SERVICE }}
+          GCS_BUCKET: ${{ vars.CLAROS_GCS_BUCKET }}
+          COOKIE_SECRET_VERSION: ${{ vars.CLAROS_COOKIE_SECRET_VERSION }}
+          REVIEW_SECRET_VERSION: ${{ vars.CLAROS_REVIEW_TOKEN_SECRET_VERSION }}
+          OPENAI_SECRET_VERSION: ${{ vars.CLAROS_OPENAI_API_KEY_VERSION }}
+        run: |
+          set -euo pipefail
+          state_file="$(mktemp)"
+          bootstrap_yaml="$(mktemp)"
+          service_yaml="$(mktemp)"
+          rm -f "$state_file" "$bootstrap_yaml" "$service_yaml"
+          trap 'rm -f "$state_file" "$bootstrap_yaml" "$service_yaml"' EXIT
+
+          python scripts/gate3-container-render.py \
+            --output "$bootstrap_yaml" \
+            --project-id "$PROJECT_ID" \
+            --region "$REGION" \
+            --service-name "$SERVICE_NAME" \
+            --image-uri "$IMAGE_URI" \
+            --gcs-bucket "$GCS_BUCKET" \
+            --public-origin "https://bootstrap.invalid" \
+            --release-sha "$GITHUB_SHA" \
+            --cookie-secret-version "$COOKIE_SECRET_VERSION" \
+            --review-secret-version "$REVIEW_SECRET_VERSION" \
+            --openai-secret-version "$OPENAI_SECRET_VERSION"
+          gcloud run services replace "$bootstrap_yaml" \
+            --project "$PROJECT_ID" --region "$REGION" --quiet
+
+          service_url="$(gcloud run services describe "$SERVICE_NAME" \
+            --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
+          python scripts/gate3-container-render.py \
+            --output "$service_yaml" \
+            --project-id "$PROJECT_ID" \
+            --region "$REGION" \
+            --service-name "$SERVICE_NAME" \
+            --image-uri "$IMAGE_URI" \
+            --gcs-bucket "$GCS_BUCKET" \
+            --public-origin "$service_url" \
+            --release-sha "$GITHUB_SHA" \
+            --cookie-secret-version "$COOKIE_SECRET_VERSION" \
+            --review-secret-version "$REVIEW_SECRET_VERSION" \
+            --openai-secret-version "$OPENAI_SECRET_VERSION"
+          gcloud run services replace "$service_yaml" \
+            --project "$PROJECT_ID" --region "$REGION" --quiet
+
+          revision_before="$(gcloud run services describe "$SERVICE_NAME" \
+            --project "$PROJECT_ID" --region "$REGION" \
+            --format='value(status.latestReadyRevisionName)')"
+          python scripts/gate3-container-staging-smoke.py seed \
+            --base-url "$service_url" --state-file "$state_file" \
+            --verify-proxy-identity
+
+          gcloud run services update "$SERVICE_NAME" \
+            --project "$PROJECT_ID" --region "$REGION" \
+            --image "$IMAGE_URI" \
+            --update-env-vars "CLAROS_REVISION_PROBE=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --quiet
+          revision_after="$(gcloud run services describe "$SERVICE_NAME" \
+            --project "$PROJECT_ID" --region "$REGION" \
+            --format='value(status.latestReadyRevisionName)')"
+          if [[ -z "$revision_before" || -z "$revision_after" || "$revision_before" == "$revision_after" ]]; then
+            echo "Cloud Run did not replace the staging revision" >&2
+            exit 1
+          fi
+          deployed_image="$(gcloud run services describe "$SERVICE_NAME" \
+            --project "$PROJECT_ID" --region "$REGION" \
+            --format='value(spec.template.spec.containers[0].image)')"
+          if [[ "$deployed_image" != "$IMAGE_URI" ]]; then
+            echo "Staging revision does not use the tested image digest" >&2
+            exit 1
+          fi
+          python scripts/gate3-container-staging-smoke.py verify \
+            --base-url "$service_url" --state-file "$state_file"
+
+  production:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.promote_to_production == true }}
+    needs:
+      - build
+      - staging
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: production
+
+    steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.11.16"
+
+      - name: Authenticate to Google Cloud without a service-account key
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db
+
+      - name: Promote the exact staging-tested digest and smoke production
+        env:
+          IMAGE_URI: ${{ needs.build.outputs.image_uri }}
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          REGION: ${{ vars.GCP_REGION }}
+          SERVICE_NAME: ${{ vars.CLAROS_PRODUCTION_SERVICE }}
+          GCS_BUCKET: ${{ vars.CLAROS_GCS_BUCKET }}
+          COOKIE_SECRET_VERSION: ${{ vars.CLAROS_COOKIE_SECRET_VERSION }}
+          REVIEW_SECRET_VERSION: ${{ vars.CLAROS_REVIEW_TOKEN_SECRET_VERSION }}
+          OPENAI_SECRET_VERSION: ${{ vars.CLAROS_OPENAI_API_KEY_VERSION }}
+        run: |
+          set -euo pipefail
+          state_file="$(mktemp)"
+          bootstrap_yaml="$(mktemp)"
+          service_yaml="$(mktemp)"
+          rm -f "$state_file" "$bootstrap_yaml" "$service_yaml"
+          trap 'rm -f "$state_file" "$bootstrap_yaml" "$service_yaml"' EXIT
+
+          python scripts/gate3-container-render.py \
+            --output "$bootstrap_yaml" \
+            --project-id "$PROJECT_ID" \
+            --region "$REGION" \
+            --service-name "$SERVICE_NAME" \
+            --image-uri "$IMAGE_URI" \
+            --gcs-bucket "$GCS_BUCKET" \
+            --public-origin "https://bootstrap.invalid" \
+            --release-sha "$GITHUB_SHA" \
+            --cookie-secret-version "$COOKIE_SECRET_VERSION" \
+            --review-secret-version "$REVIEW_SECRET_VERSION" \
+            --openai-secret-version "$OPENAI_SECRET_VERSION"
+          gcloud run services replace "$bootstrap_yaml" \
+            --project "$PROJECT_ID" --region "$REGION" --quiet
+          service_url="$(gcloud run services describe "$SERVICE_NAME" \
+            --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
+
+          python scripts/gate3-container-render.py \
+            --output "$service_yaml" \
+            --project-id "$PROJECT_ID" \
+            --region "$REGION" \
+            --service-name "$SERVICE_NAME" \
+            --image-uri "$IMAGE_URI" \
+            --gcs-bucket "$GCS_BUCKET" \
+            --public-origin "$service_url" \
+            --release-sha "$GITHUB_SHA" \
+            --cookie-secret-version "$COOKIE_SECRET_VERSION" \
+            --review-secret-version "$REVIEW_SECRET_VERSION" \
+            --openai-secret-version "$OPENAI_SECRET_VERSION"
+          gcloud run services replace "$service_yaml" \
+            --project "$PROJECT_ID" --region "$REGION" --quiet
+
+          deployed_image="$(gcloud run services describe "$SERVICE_NAME" \
+            --project "$PROJECT_ID" --region "$REGION" \
+            --format='value(spec.template.spec.containers[0].image)')"
+          if [[ "$deployed_image" != "$IMAGE_URI" ]]; then
+            echo "Production revision does not use the staging-tested digest" >&2
+            exit 1
+          fi
+          python scripts/gate3-container-staging-smoke.py seed \
+            --base-url "$service_url" --state-file "$state_file"
+          python scripts/gate3-container-staging-smoke.py verify \
+            --base-url "$service_url" --state-file "$state_file"

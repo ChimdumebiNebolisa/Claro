@@ -1,0 +1,20 @@
+steps:
+  - name: "gcr.io/cloud-builders/docker@sha256:3d00b6c1a9b862621c30fc74d4f2abfc62bcbdee631ed3febd31e7edbdf6252c"
+    env:
+      - "DOCKER_BUILDKIT=1"
+    args:
+      - build
+      - --tag
+      - "${_IMAGE_URI}"
+      - --build-arg
+      - "VCS_REF=${_VCS_REF}"
+      - --build-arg
+      - "BUILD_DATE=${_BUILD_DATE}"
+      - --build-arg
+      - "SOURCE_URL=${_SOURCE_URL}"
+      - .
+
+images:
+  - "${_IMAGE_URI}"
+
+timeout: 2700s

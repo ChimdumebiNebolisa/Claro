@@ -1,0 +1,79 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: "{{SERVICE_NAME}}"
+  annotations:
+    run.googleapis.com/ingress: all
+    run.googleapis.com/invoker-iam-disabled: "true"
+  labels:
+    app: claros
+    release_sha: "{{RELEASE_SHA}}"
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "1"
+        run.googleapis.com/execution-environment: gen2
+        run.googleapis.com/startup-cpu-boost: "true"
+    spec:
+      containerConcurrency: 4
+      timeoutSeconds: 300
+      serviceAccountName: "claros-runtime@{{PROJECT_ID}}.iam.gserviceaccount.com"
+      containers:
+        - image: "{{IMAGE_URI}}"
+          ports:
+            - name: http1
+              containerPort: 8080
+          resources:
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 0
+            timeoutSeconds: 3
+            periodSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 0
+            timeoutSeconds: 3
+            periodSeconds: 30
+            failureThreshold: 3
+          env:
+            - name: CLAROS_ENVIRONMENT
+              value: production
+            - name: CLAROS_STORAGE_BACKEND
+              value: gcs
+            - name: CLAROS_PDF_ENGINE
+              value: current
+            - name: CLAROS_GCS_BUCKET
+              value: "{{GCS_BUCKET}}"
+            - name: CLAROS_PUBLIC_ORIGIN
+              value: "{{PUBLIC_ORIGIN}}"
+            - name: CLAROS_ASSIGNMENT_TTL_SECONDS
+              value: "86400"
+            - name: CLAROS_REQUEST_TIMEOUT_SECONDS
+              value: "270"
+            - name: CLAROS_RELEASE_SHA
+              value: "{{RELEASE_SHA}}"
+            - name: CLAROS_COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: claros-cookie-secret
+                  key: "{{COOKIE_SECRET_VERSION}}"
+            - name: CLAROS_REVIEW_TOKEN_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: claros-review-token-secret
+                  key: "{{REVIEW_SECRET_VERSION}}"
+            - name: CLAROS_OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: claros-openai-api-key
+                  key: "{{OPENAI_SECRET_VERSION}}"

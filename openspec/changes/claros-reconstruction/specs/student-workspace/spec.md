@@ -1,41 +1,120 @@
 ## Purpose
 
-Defines the accessible student workflow from upload through question-by-question
-completion, optional voice assistance, resume, and honest state presentation.
+Defines the question-first, responsive, accessible student experience from
+worksheet upload through exact review, answer revision, and PDF download.
 
 ## ADDED Requirements
 
-### Requirement: Upload and question workspace
-The product MUST provide a responsive workspace with the source worksheet as the
-visual anchor, one active question at a time, a distinct final-answer editor,
-and one primary action for the current state.
+### Requirement: Truthful upload and readiness flow
+The workspace MUST expose distinct upload, document-checking, rejected, and
+worksheet-ready states. Client checks MUST validate file type and size promptly,
+while server validation remains authoritative. Progress MUST be event-derived;
+when stages are unavailable the UI MUST show an indeterminate message rather
+than invented percentages.
 
-#### Scenario: Student opens a supported worksheet
-- **WHEN** a supported PDF is accepted
-- **THEN** Question 1 opens with the worksheet preview, prompt, final-answer field, and `Review answer` action
+#### Scenario: Student uploads a worksheet
+- **WHEN** a file passes the immediate browser checks
+- **THEN** the UI submits it, announces analysis, and displays only backend-reported stages or one truthful indeterminate state
 
-### Requirement: Optional voice assistance
-Voice MUST remain separate from final-answer authority. Talk-through content
-stays in a collapsed or bounded transcript; dictation targets the editable field;
-voice cannot commit, export, select geometry, or switch questions silently.
+#### Scenario: Worksheet is ready
+- **WHEN** analysis completes successfully
+- **THEN** the UI shows title, page count, supported-question count, safe warnings, `Start Question 1`, and `View worksheet`
 
-#### Scenario: Voice is unavailable
-- **WHEN** microphone permission or speech recognition fails
-- **THEN** typed input remains usable, existing draft text remains intact, and a concise recoverable status is shown
+### Requirement: Question-first responsive hierarchy
+The active question MUST precede source context in reading and DOM order and
+MUST remain the primary task at every viewport. Desktop MUST use a task-first
+workspace with a fixed supporting source pane and no required resizer. Tablet
+MUST stack source after task. Mobile MUST expose the full worksheet through a
+keyboard-accessible full-screen dialog while leaving the question first.
 
-### Requirement: Resume without browser secrets
-The product MUST restore a valid session through an HTTP-only session cookie or
-equivalent server-managed mechanism. Assignment secrets MUST NOT be stored in
-`localStorage` or `sessionStorage`.
+#### Scenario: Desktop question is opened
+- **WHEN** the viewport is at least 1180 CSS pixels wide
+- **THEN** the exact question and task occupy the primary column and the actual source appears in a 400–440px supporting pane
 
-#### Scenario: Student reloads a valid session
-- **WHEN** the browser returns with a valid session cookie
-- **THEN** Claros restores the assignment and the last incomplete or active question
+#### Scenario: Mobile worksheet is opened
+- **WHEN** the student invokes `View worksheet` below 768 CSS pixels
+- **THEN** an accessible full-screen dialog renders the actual source, traps focus, and restores focus to the invoking control when closed
 
-### Requirement: Accessible state presentation
-Core actions MUST work with keyboard, pointer, semantic labels, visible focus,
-reduced motion, and explicit text for errors and placement states.
+### Requirement: Two equal entry paths
+Every unanswered question MUST initially show `Say my answer` and
+`Help me think it through` with equal visual weight and no preselection or
+recommendation. Both paths MUST preserve the exact question and converge on the
+same candidate comparison, review, confirmation, revision, and export rules.
+
+#### Scenario: Unanswered question receives focus
+- **WHEN** the question-choice state becomes active
+- **THEN** both entry paths, `Type instead`, and `View worksheet` are understandable and keyboard reachable without onboarding
+
+### Requirement: Complete typed operation
+Typed input MUST complete both direct and guided paths at every voice state,
+including when microphone permission or Realtime fails. Failure MUST preserve
+the candidate and relevant conversation state and MUST NOT require upload or
+page reload.
+
+#### Scenario: Microphone is unavailable
+- **WHEN** permission is denied before or during an answer
+- **THEN** the UI announces `Microphone unavailable`, preserves current text, and offers immediate `Continue by typing`
+
+#### Scenario: Guided voice disconnects
+- **WHEN** the Realtime connection is lost after guided turns exist
+- **THEN** the UI preserves the bounded transcript and candidate and allows the student to finish the final answer by typing
+
+### Requirement: Distinct comparison and exact-review states
+Rough transcript, tutoring turns, wording comparison, and exact review MUST be
+visually and semantically distinct. Mobile comparison MUST stack selectable
+versions. Exact review MUST expose `Hear it`, destination, `Change answer`, and
+`Use this exact answer` as its dominant action and MUST not expose internal
+placement or token terminology.
+
+#### Scenario: Student requests a rephrase
+- **WHEN** a safe suggestion is available
+- **THEN** the UI shows `Your words` and `Suggested wording` simultaneously with non-color selection state before entering exact review
+
+#### Scenario: Exact review is announced
+- **WHEN** a fresh review snapshot loads
+- **THEN** focus and screen-reader structure identify the exact-review heading, exact text, provenance, destination, and explicit actions
+
+### Requirement: Answer review and partial export flow
+The worksheet review MUST list questions in source order with answered or
+unanswered state, concise confirmed-answer preview, destination, edit, and
+jump-to-question actions. It MUST offer export after at least one answer is
+confirmed and MUST leave unanswered questions blank.
+
+#### Scenario: One of several questions is confirmed
+- **WHEN** the student opens worksheet review
+- **THEN** the confirmed answer and remaining unanswered questions are distinguishable and `Download completed PDF` is available
+
+### Requirement: Accessible and restrained interaction
+The complete workflow MUST support keyboard, pointer, touch, semantic labels,
+visible focus, at least 44x44px primary targets, captions, text voice states,
+mute without lost text, no color-only meaning, no forced answering timeout,
+200 percent text zoom, and reduced motion with equivalent live-region updates.
+No required action may depend on dragging or resizing.
 
 #### Scenario: Keyboard-only completion
-- **WHEN** a student uses Tab, typing, and Enter/Space without a mouse or microphone
-- **THEN** upload, editing, review, commit, next question, and export remain reachable and understandable
+- **WHEN** a student uses only keyboard navigation and typed input
+- **THEN** upload, path selection, answering, comparison, review, confirmation, revision, export, download, and dialogs remain operable and understandable
+
+#### Scenario: Reduced motion is requested
+- **WHEN** the operating system reports reduced-motion preference
+- **THEN** placement and question transitions update immediately and announce the resulting state without essential animation
+
+### Requirement: Honest marketing surface
+The public route MUST explain direct and guided paths, exact approval, source
+preservation, accessibility, supported-PDF limits, and the final CTA using an
+authentic screenshot or live preview of the implemented product. It MUST NOT
+publish fabricated metrics, customers, pricing, certifications, integrations,
+institutional claims, or an HTML recreation presented as a worksheet.
+
+#### Scenario: Marketing page loads
+- **WHEN** a visitor opens `/`
+- **THEN** the prescribed Claros navigation and product promise appear without loading PDF or Realtime runtime bundles
+
+### Requirement: Same-browser restoration
+An unexpired anonymous assignment MUST restore through a server-managed signed
+session when the same browser reloads a V2 assignment URL. No assignment bearer
+secret may be stored in `localStorage` or `sessionStorage`.
+
+#### Scenario: Authorized assignment reloads
+- **WHEN** the browser revisits an assignment with its valid owner session
+- **THEN** Claros restores current version, confirmed answers, candidate state, and the active or next incomplete question

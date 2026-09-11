@@ -1,7 +1,9 @@
 import { lazy, Suspense } from "react";
-import { Link, Route, Routes } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { ArrowRight, Check, Download, Mic, ShieldCheck, X } from "lucide-react";
 import { Wordmark } from "./Brand";
+import "../styles/tokens.css";
+import "../styles/app.css";
 
 const Workspace = lazy(() => import("./Workspace"));
 
@@ -13,7 +15,7 @@ function Landing() {
         <div className="marketing-links">
           <a href="#journey">Follow one answer</a>
           <a href="#supported">Supported PDFs</a>
-          <Link className="button button-ghost" to="/app">
+          <Link className="button button-ghost" to="/legacy/app">
             Open workspace <ArrowRight size={16} />
           </Link>
         </div>
@@ -28,7 +30,7 @@ function Landing() {
               Talk it through, dictate or type the final answer, then review every word and where it will go before you confirm it.
             </p>
             <div className="collage-actions">
-              <Link className="button button-primary" to="/app">
+              <Link className="button button-primary" to="/legacy/app">
                 Open workspace <ArrowRight size={17} />
               </Link>
               <a className="collage-text-link" href="#journey">Follow one answer <ArrowRight size={15} /></a>
@@ -111,7 +113,7 @@ function Landing() {
           <h2>Put your next answer on the page.</h2>
         </div>
         <div className="hero-actions">
-            <Link className="button button-primary" to="/app">
+            <Link className="button button-primary" to="/legacy/app">
               Open workspace <ArrowRight size={17} />
             </Link>
           </div>
@@ -120,7 +122,7 @@ function Landing() {
       <footer className="marketing-footer page-width">
         <Wordmark />
         <span>The original worksheet stays unchanged until export.</span>
-        <Link to="/app">Open workspace <ArrowRight size={14} /></Link>
+        <Link to="/legacy/app">Open workspace <ArrowRight size={14} /></Link>
       </footer>
     </main>
   );
@@ -131,11 +133,18 @@ function WorkspaceFallback() {
 }
 
 export default function App() {
+  const location = useLocation();
+  const showWorkspace = location.pathname === "/legacy/app";
+
   return (
-    <Routes>
-      <Route path="/" element={<Landing />} />
-      <Route path="/app" element={<Suspense fallback={<WorkspaceFallback />}><Workspace /></Suspense>} />
-      <Route path="*" element={<Landing />} />
-    </Routes>
+    <div className="legacy-root">
+      {showWorkspace ? (
+        <Suspense fallback={<WorkspaceFallback />}>
+          <Workspace />
+        </Suspense>
+      ) : (
+        <Landing />
+      )}
+    </div>
   );
 }

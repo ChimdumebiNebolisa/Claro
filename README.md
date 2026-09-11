@@ -47,3 +47,31 @@ are new contracts, not hidden fallbacks.
 - The original PDF is never mutated; export returns a derivative PDF.
 - Voice is optional. If SpeechRecognition is unavailable, typed input remains
   complete.
+
+## OpenPDF V2 export path
+
+The production-capable OpenPDF renderer is selected explicitly; there is no
+automatic fallback. The existing `current` renderer remains the default and the
+Cloud Run service template still names it, so building or pushing this branch
+does not activate OpenPDF in production.
+
+For a local PowerShell run with the real V2 UI and `/api/v2` endpoint, install
+Java 21 and Maven 3.9.11, then run:
+
+```powershell
+npm ci
+npm run build
+npm run build:openpdf
+$qpdf = & .\scripts\bootstrap-qpdf.ps1
+$env:CLAROS_PDF_ENGINE = "openpdf"
+$env:CLAROS_OPENPDF_QPDF_PATH = $qpdf
+$env:CLAROS_PUBLIC_ORIGIN = "http://127.0.0.1:8080"
+$env:CLAROS_LOCAL_STORAGE_PATH = ".local/openpdf-app"
+.venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8080
+```
+
+Open `http://127.0.0.1:8080/app`. Selecting OpenPDF verifies Java 21+, the
+shaded worker JAR, the allowlisted Noto Sans font, and qpdf during application
+startup. Each derivative stays quarantined until qpdf and the independent
+PDFBox validator pass. PDF.js runs only in the CI/release compatibility check,
+not in the synchronous export request.

@@ -1,51 +1,74 @@
 ## Why
 
-Claros needs a clean product boundary around one safe workflow: a student
-uploads a supported short-answer worksheet, works through one question at a
-time, explicitly approves an exact final answer, and exports a new PDF. The
-historical branch mixed multiple product generations and trusted too much
-client-side coordination, so this branch rebuilds the V1 around the supplied
-reconstruction PRD and canonical design reference.
+Claros must replace its sample-only V1 reconstruction with a production-capable,
+accessibility-first worksheet workflow before the Nerdy AI Hackathon deadline.
+The V2 authorities require exact source grounding, equal direct and guided answer
+paths, mandatory exact review, deterministic PDF placement, durable anonymous
+assignments, and evidence from the running product rather than mockups.
 
 ## What Changes
 
-- **BREAKING** Replace the historical runtime with a React + TypeScript Vite
-  application and a small typed backend facade.
-- Add whole-document upload validation with stable unsupported reason codes.
-- Add the canonical upload, analysis, drafting, review, placement, commit,
-  resume, completion, and export states.
-- Add exact-answer integrity checks and task-bound commit authorization.
-- Keep voice optional and subordinate to typed input; voice cannot commit,
-  export, or control geometry.
-- Add the light-first Claros design system, responsive workspace, accessible
-  keyboard flow, and truthful state copy from the supplied design reference.
-- Remove legacy target picking, layout review, broad OCR, teacher review, fake
-  processing progress, and pre-export write semantics from the V1 runtime.
-- Add focused domain, API, component, and end-to-end verification surfaces.
+- **BREAKING** Rebaseline the active reconstruction from the V1 sample-only
+  slice to the V2 product contract and Gate 0–7 delivery program.
+- **BREAKING** Replace the Node in-memory `/api/v1` production path with a
+  stateless FastAPI `/api/v2` service backed by private Google Cloud Storage;
+  retain V1 temporarily at `/legacy` only for migration evidence.
+- **BREAKING** Replace Radix-based V2 controls with Untitled UI React and
+  replace `react-pdf` with authentic, read-only EmbedPDF rendering.
+- Accept native-text sequential short-answer PDFs within explicit limits,
+  derive deterministic physical evidence, and use model-selected block IDs to
+  construct exact ordered questions without model-owned geometry.
+- Give every unanswered question two equally weighted paths—direct answering
+  and guided reasoning—with a complete typed path at every voice state.
+- Preserve candidate provenance, make rephrasing opt-in and visibly
+  comparative, and require exact-text review before any answer is confirmed.
+- Resolve placement deterministically to inline, attached answer page, or safe
+  rejection; lack of inline room alone is never a rejection.
+- Export a derivative from immutable source bytes and current confirmed
+  answers, including partial assignments, exact Unicode, and validated
+  appendix pages where needed.
+- Promote the validated OpenPDF renderer behind explicit engine selection, a
+  bounded Java process boundary, and mandatory qpdf plus PDFBox publication
+  gates; retain PDF.js as CI/release compatibility evidence only.
+- Add signed anonymous access, optimistic concurrency, idempotent confirmation
+  and export, Realtime WebRTC credentials, security/privacy boundaries, a gold
+  PDF corpus, and browser/PDF/accessibility evidence gates.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `worksheet-contract`: Validate the supported native-text short-answer PDF
-  contract and return stable rejection reasons.
-- `answer-integrity`: Model draft, review, placement, committed answer, and
-  task-bound write authorization with exact-text preservation.
-- `student-workspace`: Provide the responsive upload-to-export workflow,
-  accessible state presentation, optional voice assistance, and session resume.
-- `safe-export`: Revalidate source and placement, then export a new PDF from
-  committed answers only.
+- `worksheet-contract`: Define accepted document limits, grounded-question
+  readiness, stable rejection behavior, and safe student projections.
+- `answer-integrity`: Define provenance, optional rephrasing, mandatory exact
+  review, answer-bound confirmation, revision, and exact-text preservation.
+- `student-workspace`: Define the question-first, responsive, accessible
+  upload-to-export experience and its truthful visible states.
+- `safe-export`: Define immutable-source derivative generation from confirmed
+  answers, deterministic placement revalidation, and authorized download.
+- `document-understanding`: Define deterministic physical IR, closed-world
+  semantic block mapping, exact reconstruction, and corpus validation.
+- `deterministic-placement`: Define coordinate authority, placement priority,
+  readable fitting, appendix fallback, and safe rejection.
+- `assignment-lifecycle`: Define `/api/v2`, signed anonymous ownership, durable
+  GCS state, versioning, TTL, concurrency, and privacy/security behavior.
+- `voice-guidance`: Define direct and guided Realtime behavior, captions,
+  narrow mutation boundaries, exact-state voice confirmation, and recovery.
 
 ### Modified Capabilities
 
-None. The branch is rebuilt from an empty tracked content set.
+None. No base specifications have been archived; all eight capability files
+remain new deltas within this active change.
 
 ## Impact
 
-- New Vite/React/TypeScript frontend under `src/` and a small Node HTTP API
-  adapter under `server/`.
-- New runtime contracts and tests under `tests/`.
-- New OpenSpec project integration and reconstruction artifacts.
-- New dependency set for React Router, XState, Zod, PDF rendering, upload,
-  accessible primitives, and verification tooling.
-- Existing `main` and all other worktrees remain unchanged.
+- Rebuilds the V2 route hierarchy while preserving the current app under
+  `/legacy` until the Gate 6 cutover.
+- Introduces FastAPI, GCS, the Python analysis/geometry stack, the maintained
+  Java 21/OpenPDF worker, qpdf and PDFBox validators, OpenAI Responses, OpenAI
+  Realtime, Untitled UI React, EmbedPDF, TanStack Query, Motion, MSW, and
+  generated OpenAPI client contracts.
+- Replaces sample-hash admission, client-coordinated placement, ASCII export,
+  in-memory assignment truth, and all-answers-required export behavior.
+- Adds gold-corpus, contract, integration, browser, accessibility, visual,
+  security, deployment, and demo evidence under the gated execution plan.

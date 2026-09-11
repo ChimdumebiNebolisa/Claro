@@ -1,0 +1,10 @@
+{
+  "version": "8",
+  "framework": "vite",
+  "aliases": {
+    "components": "@/components/",
+    "utils": "@/lib/",
+    "hooks": "@/hooks/",
+    "styles": "@/styles/"
+  }
+}

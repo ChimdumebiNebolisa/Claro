@@ -418,7 +418,7 @@ export default function Workspace() {
         <header className="app-bar page-width">
           <Wordmark />
           <span className="app-bar-context">Student workspace</span>
-          <Link className="app-bar-link" to="/">Exit</Link>
+          <Link className="app-bar-link" to="/legacy">Exit</Link>
         </header>
         <main><UploadSurface onLoad={load} busy={state.value === "analyzing"} error={state.context.error} /></main>
       </div>
@@ -460,7 +460,7 @@ export default function Workspace() {
       <Wordmark />
       <span className="app-bar-file">{assignment.worksheet.title}</span>
       <span className="app-bar-progress">Question {currentQuestion.index} of {assignment.worksheet.questions.length}</span>
-      <Link className="app-bar-link" to="/">Exit</Link>
+      <Link className="app-bar-link" to="/legacy">Exit</Link>
     </header>
   );
 

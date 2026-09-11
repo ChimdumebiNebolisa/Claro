@@ -1,0 +1,580 @@
+.surface,
+.reviewSurface,
+.centeredSurface {
+  width: 100%;
+  color: var(--claros-ink);
+}
+
+.surface,
+.reviewSurface {
+  max-width: 760px;
+}
+
+.centeredSurface {
+  max-width: 680px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  color: var(--claros-blue-dark);
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.title {
+  max-width: 680px;
+  margin: 0;
+  color: var(--claros-ink);
+  font-size: clamp(28px, 3.2vw, 32px);
+  font-weight: 720;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+}
+
+.intro,
+.reviewInstruction {
+  max-width: 620px;
+  margin: 14px 0 0;
+  color: var(--claros-muted);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.reviewInstruction {
+  color: var(--claros-ink);
+  font-weight: 600;
+}
+
+.answerCard,
+.exactAnswerCard,
+.comparisonCard,
+.questionRow,
+.exportBar,
+.fileCard {
+  border: 1px solid var(--claros-line);
+  background: var(--claros-paper);
+}
+
+.answerCard {
+  margin: 28px 0 20px;
+  padding: 20px;
+  border-radius: 14px;
+}
+
+.answerCardEmphasized {
+  border-color: var(--claros-blue-mist);
+  background: var(--claros-blue-soft);
+}
+
+.answerCard blockquote,
+.comparisonText,
+.exactText {
+  margin: 12px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.answerCard blockquote {
+  color: var(--claros-ink);
+  font-size: 18px;
+  line-height: 1.55;
+}
+
+.provenance {
+  display: inline-flex;
+  align-items: center;
+  color: var(--claros-blue-dark);
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.loadingRegion {
+  min-height: 112px;
+  display: grid;
+  place-items: center;
+  margin-top: 20px;
+  padding: 20px;
+  border-radius: 14px;
+  background: var(--claros-soft);
+}
+
+.actions,
+.approvalActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.control,
+.rowControl {
+  min-height: 44px;
+  border: 0;
+}
+
+.rowControl {
+  background: transparent;
+}
+
+.comparisonGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.comparisonCard {
+  display: flex;
+  min-width: 0;
+  min-height: 260px;
+  flex-direction: column;
+  padding: 20px;
+  border-radius: 16px;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.comparisonCardSelected {
+  border-color: var(--claros-blue);
+  background: var(--claros-blue-soft);
+  box-shadow: 0 0 0 1px var(--claros-blue-mist);
+}
+
+.cardHeader {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.selectedLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--claros-blue-dark);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.selectedLabel svg {
+  width: 16px;
+  height: 16px;
+}
+
+.comparisonText {
+  flex: 1;
+  color: var(--claros-ink);
+  font-size: 18px;
+  line-height: 1.55;
+}
+
+.cardAction {
+  width: 100%;
+  white-space: normal;
+}
+
+.secondaryAction {
+  margin-top: 12px;
+}
+
+.reviewSurface {
+  padding: 28px;
+  border: 1px solid var(--claros-blue-mist);
+  border-radius: 20px;
+  background: var(--claros-paper);
+  box-shadow: 0 18px 45px rgba(17, 24, 39, 0.08);
+}
+
+.exactAnswerCard {
+  margin-top: 28px;
+  padding: 20px;
+  border-radius: 16px;
+}
+
+.exactText {
+  padding: 22px;
+  border-radius: 12px;
+  background: var(--claros-night);
+  color: var(--claros-paper);
+  font-size: clamp(20px, 2.5vw, 26px);
+  font-weight: 540;
+  letter-spacing: -0.015em;
+  line-height: 1.5;
+}
+
+.exactAnswerCard .control {
+  margin-top: 16px;
+}
+
+.destination {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid;
+  border-radius: 12px;
+}
+
+.destination svg {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+}
+
+.destination > div > strong,
+.destination > div > span,
+.fileCard > div > strong,
+.fileCard > div > span,
+.exportBar > div > strong,
+.exportBar > div > span {
+  display: block;
+}
+
+.destination > div > strong {
+  font-size: 14px;
+}
+
+.destination > div > span {
+  margin-top: 3px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.destinationInline {
+  border-color: #b7e1ce;
+  background: var(--claros-green-soft);
+  color: #116b4b;
+}
+
+.destinationInline > div > span {
+  color: var(--claros-ink);
+}
+
+.destinationAppendix {
+  border-color: #f0d49c;
+  background: var(--claros-amber-soft);
+  color: #874907;
+}
+
+.destinationAppendix > div > span {
+  color: var(--claros-ink);
+}
+
+.successMark {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 20px;
+  place-items: center;
+  border: 1px solid #b7e1ce;
+  border-radius: 14px;
+  background: var(--claros-green-soft);
+  color: var(--claros-green);
+}
+
+.successMark svg {
+  width: 28px;
+  height: 28px;
+}
+
+.handoff {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(150px, 0.42fr);
+  align-items: center;
+  gap: 14px;
+  margin-top: 28px;
+}
+
+.handoffAnswer,
+.handoffDestination {
+  border-radius: 14px;
+}
+
+.handoffAnswer {
+  padding: 18px;
+  border: 1px solid var(--claros-blue-mist);
+  background: var(--claros-blue-soft);
+  animation: answer-handoff 420ms ease-out both;
+}
+
+.handoffAnswer p {
+  margin: 9px 0 0;
+  color: var(--claros-ink);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.handoffArrow {
+  width: 24px;
+  height: 24px;
+  color: var(--claros-blue);
+}
+
+.handoffDestination {
+  display: flex;
+  min-height: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 18px 14px;
+  border: 1px solid #b7e1ce;
+  background: var(--claros-green-soft);
+  color: var(--claros-green);
+  text-align: center;
+}
+
+.handoffDestination svg {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+}
+
+.handoffDestination span {
+  color: var(--claros-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.questionList {
+  display: grid;
+  gap: 12px;
+  margin: 28px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.questionRow {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 16px;
+  padding: 20px;
+  border-radius: 14px;
+}
+
+.questionNumber {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--claros-soft);
+  color: var(--claros-muted);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.questionBody {
+  min-width: 0;
+}
+
+.questionHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.questionHeading h2 {
+  margin: 0;
+  color: var(--claros-ink);
+  font-size: 16px;
+  font-weight: 680;
+  letter-spacing: -0.01em;
+  line-height: 1.5;
+}
+
+.stateLabel {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.stateAnswered {
+  background: var(--claros-green-soft);
+  color: #116b4b;
+}
+
+.stateUnanswered {
+  background: var(--claros-soft);
+  color: var(--claros-muted);
+}
+
+.answerPreview,
+.unansweredCopy {
+  margin: 10px 0 0;
+  color: var(--claros-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.answerPreview {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.unansweredCopy {
+  font-style: italic;
+}
+
+.answerMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 9px;
+  color: var(--claros-muted);
+  font-size: 13px;
+}
+
+.rowActions {
+  margin-top: 10px;
+}
+
+.rowControl {
+  justify-content: flex-start;
+}
+
+.exportBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-top: 20px;
+  padding: 20px;
+  border-radius: 14px;
+}
+
+.exportBar > div > strong,
+.fileCard > div > strong {
+  color: var(--claros-ink);
+  font-size: 14px;
+}
+
+.exportBar > div > span,
+.fileCard > div > span {
+  margin-top: 4px;
+  color: var(--claros-muted);
+  font-size: 13px;
+}
+
+.exportLoader {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  margin-top: 28px;
+  border: 1px solid var(--claros-line);
+  border-radius: 16px;
+  background: var(--claros-soft);
+}
+
+.fileCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 28px;
+  padding: 18px;
+  border-radius: 14px;
+  text-align: left;
+}
+
+.fileCard > svg {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  color: var(--claros-green);
+}
+
+@keyframes answer-handoff {
+  from {
+    opacity: 0.72;
+    transform: translateX(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (max-width: 640px) {
+  .reviewSurface {
+    padding: 20px;
+    border-radius: 16px;
+  }
+
+  .comparisonGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .comparisonCard {
+    min-height: auto;
+  }
+
+  .actions,
+  .approvalActions,
+  .exportBar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .control {
+    width: 100%;
+  }
+
+  .handoff {
+    grid-template-columns: 1fr;
+  }
+
+  .handoffArrow {
+    margin: -4px auto;
+    transform: rotate(90deg);
+  }
+
+  .questionRow {
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .questionNumber {
+    width: 32px;
+    height: 32px;
+  }
+
+  .questionHeading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .comparisonCard,
+  .handoffAnswer {
+    animation: none;
+    transition: none;
+  }
+}

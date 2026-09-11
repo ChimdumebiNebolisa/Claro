@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+  "generator_version": "claros-gold-corpus-v1",
+  "license": "Synthetic test fixtures; project-authored and free of student data.",
+  "fixtures": [
+    {
+      "fixture_id": "biology-polished",
+      "file": "01-biology-polished.pdf",
+      "sha256": "495b99fed834981299d9a60bc9845a5d755437ff272ed48477a390cf5940059f",
+      "size_bytes": 1552,
+      "expected": {
+        "outcome": "accept",
+        "question_text": [
+          "1. What organelle releases usable energy from food?",
+          "2. Why do plant cells need chloroplasts?"
+        ],
+        "placement": "inline"
+      }
+    },
+    {
+      "fixture_id": "middle-school-science",
+      "file": "02-middle-school-science.pdf",
+      "sha256": "811eb822866bdf2cb171682a8a27ed7ea6749c97e03dbd02d5b4e2cc4c1a1135",
+      "size_bytes": 1560,
+      "expected": {
+        "outcome": "accept",
+        "question_text": [
+          "1. What happens to speed when a net force increases?",
+          "2. Give one example of friction helping you."
+        ],
+        "placement": "inline"
+      }
+    },
+    {
+      "fixture_id": "non-science-short-answer",
+      "file": "03-non-science-short-answer.pdf",
+      "sha256": "80c7e73dd5af98ac6a4b834300a1e65cef5379a07aa11d4fa558324ae7efcf72",
+      "size_bytes": 1556,
+      "expected": {
+        "outcome": "accept",
+        "question_text": [
+          "1. Why is voting one way citizens participate?",
+          "2. Name one responsibility of a local government."
+        ],
+        "placement": "inline"
+      }
+    },
+    {
+      "fixture_id": "blank-answer-lines",
+      "file": "04-blank-answer-lines.pdf",
+      "sha256": "0701caaf24b3095bf6b50c4261f44652dea4686aff631927ae880cfb6483bb44",
+      "size_bytes": 1467,
+      "expected": {
+        "outcome": "accept",
+        "question_text": [
+          "1. How does warm air usually move?"
+        ],
+        "placement": "inline",
+        "region_kind": "answer_line_group"
+      }
+    },
+    {
+      "fixture_id": "rectangular-answer-boxes",
+      "file": "05-rectangular-answer-boxes.pdf",
+      "sha256": "6cb54cf44c866cfaba4f03ea0bf7f17794282975584512f390f21ce4ce360c33",
+      "size_bytes": 1461,
+      "expected": {
+        "outcome": "accept",
+        "question_text": [
+          "1. What choice changes the main character?"
+        ],
+        "placement": "inline",
+        "region_kind": "safe_box"
+      }
+    },
+    {
+      "fixture_id": "multi-page-order",
+      "file": "06-multi-page-order.pdf",
+      "sha256": "eefd84e04c734936efae91c651bed351f6f14bb1de7f18da5702f4fbc94e5389",
+      "size_bytes": 2146,
+      "expected": {
+        "outcome": "accept",
+        "question_text": [
+          "1. How does water enter the atmosphere?",
+          "2. What forms when vapor cools?",
+          "3. Why does water flow downhill?",
+          "4. Where can groundwater collect?"
+        ],
+        "placement": "inline"
+      }
+    },
+    {
+      "fixture_id": "long-answer-appendix",
+      "file": "07-long-answer-appendix.pdf",
+      "sha256": "b469fd0411dbf3f8012a821c196cd2270a8df64114810b11c67494dccf2de736",
+      "size_bytes": 1473,
+      "expected": {
+        "outcome": "accept",
+        "question_text": [
+          "1. Explain how the evidence supports the claim."
+        ],
+        "placement": "appendix",
+        "sample_answer": "Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable. Evidence must remain exact and readable."
+      }
+    },
+    {
+      "fixture_id": "unicode-punctuation-names",
+      "file": "08-unicode-punctuation-names.pdf",
+      "sha256": "ca9865e140d83ede917629da2d3498843949a4da2d98a0b609cbf8ad48335ac3",
+      "size_bytes": 16052,
+      "expected": {
+        "outcome": "accept",
+        "question_text": [
+          "1. Why does Zoë call the decision “unfair”—and what changes?",
+          "2. What does José’s response reveal?"
+        ],
+        "placement": "inline"
+      }
+    },
+    {
+      "fixture_id": "rotated-crop-box",
+      "file": "09-rotated-crop-box.pdf",
+      "sha256": "1e50e8edfb338478066e908cfb6540574d2598c3b3b3a7cd44920bb6a3204327",
+      "size_bytes": 1097,
+      "expected": {
+        "outcome": "accept",
+        "question_text": [
+          "1. What pattern appears in the data?"
+        ],
+        "placement": "appendix",
+        "ambiguity_flags": [
+          "non_default_crop_box",
+          "non_identity_rotation"
+        ]
+      }
+    },
+    {
+      "fixture_id": "no-safe-inline-region",
+      "file": "10-no-safe-inline-region.pdf",
+      "sha256": "642f51e6b8359f227797163e751896d787937cdd92bae7ef1b8ac56277103440",
+      "size_bytes": 15694,
+      "expected": {
+        "outcome": "accept",
+        "question_text": [
+          "1. State the author’s central claim."
+        ],
+        "placement": "appendix"
+      }
+    },
+    {
+      "fixture_id": "controlled-scan-rejection",
+      "file": "11-controlled-scan-rejection.pdf",
+      "sha256": "a7b2818ea1ea7a7055a3dcd8ffd3311f4ab3cca631bd9f6dffb03b4a198574fe",
+      "size_bytes": 1742,
+      "expected": {
+        "outcome": "reject",
+        "error_code": "requires_ocr"
+      }
+    },
+    {
+      "fixture_id": "ambiguous-question-boundary",
+      "file": "12-ambiguous-question-boundary.pdf",
+      "sha256": "7cce5a0b5a31ce0e0857fe4823e0a6bcaa5f85c09766916e4c7261de584f5cb1",
+      "size_bytes": 1553,
+      "expected": {
+        "outcome": "reject",
+        "error_code": "ambiguous_question_boundaries"
+      }
+    }
+  ]
+}

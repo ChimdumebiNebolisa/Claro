@@ -1,0 +1,626 @@
+{
+  "schema_version": 1,
+  "environment": {
+    "platform": "Windows-10-10.0.26200-SP0",
+    "python": "3.11.9",
+    "java": "openjdk version \"21.0.10\" 2026-01-20 LTS",
+    "node": "v24.14.1",
+    "qpdf": "qpdf version 12.3.2",
+    "note": "Developer-workstation sequential evidence; not a throughput claim.",
+    "memory_note": "RSS samples cover each launched parent process; Chromium child RSS is not included."
+  },
+  "baseline": {
+    "environment": {
+      "platform": "Windows-10-10.0.26200-SP0",
+      "python": "3.11.9",
+      "note": "Developer-workstation evidence; not a production throughput claim."
+    },
+    "concurrency": {
+      "1": {
+        "jobs": 1,
+        "wall_ms": 9194,
+        "mean": {
+          "total_ms": 9194,
+          "worker_process_ms": 1781,
+          "worker_internal_render_ms": 1333,
+          "cold_start_overhead_ms": 448,
+          "validation_ms": 6781,
+          "qpdf_ms": 109,
+          "pdfbox_ms": 2797,
+          "pdfjs_ms": 3875,
+          "peak_worker_rss_bytes": 75149312,
+          "output_bytes": 14860,
+          "temporary_peak_bytes": 18477,
+          "cleanup_ms": 31
+        },
+        "max": {
+          "total_ms": 9194,
+          "worker_process_ms": 1781,
+          "worker_internal_render_ms": 1333,
+          "cold_start_overhead_ms": 448,
+          "validation_ms": 6781,
+          "qpdf_ms": 109,
+          "pdfbox_ms": 2797,
+          "pdfjs_ms": 3875,
+          "peak_worker_rss_bytes": 75149312,
+          "output_bytes": 14860,
+          "temporary_peak_bytes": 18477,
+          "cleanup_ms": 31
+        },
+        "batch_wall_ms": 9325
+      },
+      "5": {
+        "jobs": 5,
+        "wall_ms": 19472,
+        "mean": {
+          "total_ms": 18634,
+          "worker_process_ms": 2341,
+          "worker_internal_render_ms": 1783,
+          "cold_start_overhead_ms": 557,
+          "validation_ms": 15063,
+          "qpdf_ms": 228,
+          "pdfbox_ms": 9481,
+          "pdfjs_ms": 5353,
+          "peak_worker_rss_bytes": 74382541,
+          "output_bytes": 14860,
+          "temporary_peak_bytes": 18477,
+          "cleanup_ms": 85
+        },
+        "max": {
+          "total_ms": 19472,
+          "worker_process_ms": 2359,
+          "worker_internal_render_ms": 1797,
+          "cold_start_overhead_ms": 586,
+          "validation_ms": 15797,
+          "qpdf_ms": 266,
+          "pdfbox_ms": 9672,
+          "pdfjs_ms": 6141,
+          "peak_worker_rss_bytes": 74711040,
+          "output_bytes": 14860,
+          "temporary_peak_bytes": 18477,
+          "cleanup_ms": 157
+        },
+        "batch_wall_ms": 19581
+      },
+      "10": {
+        "jobs": 10,
+        "wall_ms": 48936,
+        "mean": {
+          "total_ms": 46959,
+          "worker_process_ms": 4997,
+          "worker_internal_render_ms": 3941,
+          "cold_start_overhead_ms": 1056,
+          "validation_ms": 38520,
+          "qpdf_ms": 217,
+          "pdfbox_ms": 28406,
+          "pdfjs_ms": 9897,
+          "peak_worker_rss_bytes": 73510912,
+          "output_bytes": 14860,
+          "temporary_peak_bytes": 18477,
+          "cleanup_ms": 390
+        },
+        "max": {
+          "total_ms": 48936,
+          "worker_process_ms": 5812,
+          "worker_internal_render_ms": 4767,
+          "cold_start_overhead_ms": 1210,
+          "validation_ms": 40094,
+          "qpdf_ms": 328,
+          "pdfbox_ms": 28969,
+          "pdfjs_ms": 11062,
+          "peak_worker_rss_bytes": 74756096,
+          "output_bytes": 14860,
+          "temporary_peak_bytes": 18477,
+          "cleanup_ms": 828
+        },
+        "batch_wall_ms": 49100
+      }
+    },
+    "failure_path_ms": 610,
+    "failure_cleanup_ms": 15
+  },
+  "differential": {
+    "cases": [
+      {
+        "case": "valid_control",
+        "expected": "accept",
+        "validators": {
+          "qpdf": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 147,
+            "peak_rss_bytes": 8945664
+          },
+          "pdfbox": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 2832,
+            "peak_rss_bytes": 114470912
+          },
+          "pdfjs": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 4074,
+            "peak_rss_bytes": 115007488
+          }
+        },
+        "gate_accepts": {
+          "full": true,
+          "qpdf_pdfbox": true,
+          "pdfbox_only": true
+        }
+      },
+      {
+        "case": "malformed_structure",
+        "expected": "reject",
+        "validators": {
+          "qpdf": {
+            "accepted": false,
+            "code": "qpdf_check",
+            "duration_ms": 141,
+            "peak_rss_bytes": 8962048
+          },
+          "pdfbox": {
+            "accepted": false,
+            "code": "generated_text_exact",
+            "duration_ms": 2240,
+            "peak_rss_bytes": 101535744
+          },
+          "pdfjs": {
+            "accepted": false,
+            "code": "pdfjs_validation",
+            "duration_ms": 4041,
+            "peak_rss_bytes": 114733056
+          }
+        },
+        "gate_accepts": {
+          "full": false,
+          "qpdf_pdfbox": false,
+          "pdfbox_only": false
+        }
+      },
+      {
+        "case": "ligature_bad_tounicode",
+        "expected": "reject",
+        "validators": {
+          "qpdf": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 147,
+            "peak_rss_bytes": 8982528
+          },
+          "pdfbox": {
+            "accepted": false,
+            "code": "generated_text_exact",
+            "duration_ms": 2691,
+            "peak_rss_bytes": 120041472
+          },
+          "pdfjs": {
+            "accepted": false,
+            "code": "pdfjs_validation",
+            "duration_ms": 4499,
+            "peak_rss_bytes": 114335744
+          }
+        },
+        "gate_accepts": {
+          "full": false,
+          "qpdf_pdfbox": false,
+          "pdfbox_only": false
+        }
+      },
+      {
+        "case": "wrong_generated_text",
+        "expected": "reject",
+        "validators": {
+          "qpdf": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 162,
+            "peak_rss_bytes": 8957952
+          },
+          "pdfbox": {
+            "accepted": false,
+            "code": "generated_text_exact",
+            "duration_ms": 2611,
+            "peak_rss_bytes": 112902144
+          },
+          "pdfjs": {
+            "accepted": false,
+            "code": "pdfjs_validation",
+            "duration_ms": 4629,
+            "peak_rss_bytes": 111493120
+          }
+        },
+        "gate_accepts": {
+          "full": false,
+          "qpdf_pdfbox": false,
+          "pdfbox_only": false
+        }
+      },
+      {
+        "case": "missing_generated_text",
+        "expected": "reject",
+        "validators": {
+          "qpdf": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 345,
+            "peak_rss_bytes": 8949760
+          },
+          "pdfbox": {
+            "accepted": false,
+            "code": "source_semantics",
+            "duration_ms": 2246,
+            "peak_rss_bytes": 101261312
+          },
+          "pdfjs": {
+            "accepted": false,
+            "code": "pdfjs_validation",
+            "duration_ms": 3880,
+            "peak_rss_bytes": 113340416
+          }
+        },
+        "gate_accepts": {
+          "full": false,
+          "qpdf_pdfbox": false,
+          "pdfbox_only": false
+        }
+      },
+      {
+        "case": "incorrect_physical_coordinates",
+        "expected": "reject",
+        "validators": {
+          "qpdf": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 140,
+            "peak_rss_bytes": 8019968
+          },
+          "pdfbox": {
+            "accepted": false,
+            "code": "placement_exact",
+            "duration_ms": 2412,
+            "peak_rss_bytes": 113266688
+          },
+          "pdfjs": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 4147,
+            "peak_rss_bytes": 112435200
+          }
+        },
+        "gate_accepts": {
+          "full": false,
+          "qpdf_pdfbox": false,
+          "pdfbox_only": false
+        }
+      },
+      {
+        "case": "page_box_mutation",
+        "expected": "reject",
+        "validators": {
+          "qpdf": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 135,
+            "peak_rss_bytes": 8949760
+          },
+          "pdfbox": {
+            "accepted": false,
+            "code": "source_semantics",
+            "duration_ms": 2222,
+            "peak_rss_bytes": 106987520
+          },
+          "pdfjs": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 3819,
+            "peak_rss_bytes": 115359744
+          }
+        },
+        "gate_accepts": {
+          "full": false,
+          "qpdf_pdfbox": false,
+          "pdfbox_only": false
+        }
+      },
+      {
+        "case": "page_rotation_mutation",
+        "expected": "reject",
+        "validators": {
+          "qpdf": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 140,
+            "peak_rss_bytes": 7233536
+          },
+          "pdfbox": {
+            "accepted": false,
+            "code": "source_semantics",
+            "duration_ms": 2326,
+            "peak_rss_bytes": 103112704
+          },
+          "pdfjs": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 3739,
+            "peak_rss_bytes": 112644096
+          }
+        },
+        "gate_accepts": {
+          "full": false,
+          "qpdf_pdfbox": false,
+          "pdfbox_only": false
+        }
+      },
+      {
+        "case": "source_content_stream_mutation",
+        "expected": "reject",
+        "validators": {
+          "qpdf": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 139,
+            "peak_rss_bytes": 8966144
+          },
+          "pdfbox": {
+            "accepted": false,
+            "code": "source_semantics",
+            "duration_ms": 2325,
+            "peak_rss_bytes": 112144384
+          },
+          "pdfjs": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 4392,
+            "peak_rss_bytes": 111366144
+          }
+        },
+        "gate_accepts": {
+          "full": false,
+          "qpdf_pdfbox": false,
+          "pdfbox_only": false
+        }
+      },
+      {
+        "case": "annotation_mutation",
+        "expected": "reject",
+        "validators": {
+          "qpdf": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 144,
+            "peak_rss_bytes": 8966144
+          },
+          "pdfbox": {
+            "accepted": false,
+            "code": "source_semantics",
+            "duration_ms": 2342,
+            "peak_rss_bytes": 114118656
+          },
+          "pdfjs": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 3981,
+            "peak_rss_bytes": 112934912
+          }
+        },
+        "gate_accepts": {
+          "full": false,
+          "qpdf_pdfbox": false,
+          "pdfbox_only": false
+        }
+      },
+      {
+        "case": "form_mutation",
+        "expected": "reject",
+        "validators": {
+          "qpdf": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 153,
+            "peak_rss_bytes": 8994816
+          },
+          "pdfbox": {
+            "accepted": false,
+            "code": "source_semantics",
+            "duration_ms": 2688,
+            "peak_rss_bytes": 143011840
+          },
+          "pdfjs": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 3820,
+            "peak_rss_bytes": 112762880
+          }
+        },
+        "gate_accepts": {
+          "full": false,
+          "qpdf_pdfbox": false,
+          "pdfbox_only": false
+        }
+      },
+      {
+        "case": "link_mutation",
+        "expected": "reject",
+        "validators": {
+          "qpdf": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 111,
+            "peak_rss_bytes": 8499200
+          },
+          "pdfbox": {
+            "accepted": false,
+            "code": "source_semantics",
+            "duration_ms": 2561,
+            "peak_rss_bytes": 114192384
+          },
+          "pdfjs": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 3862,
+            "peak_rss_bytes": 112893952
+          }
+        },
+        "gate_accepts": {
+          "full": false,
+          "qpdf_pdfbox": false,
+          "pdfbox_only": false
+        }
+      },
+      {
+        "case": "outline_mutation",
+        "expected": "reject",
+        "validators": {
+          "qpdf": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 138,
+            "peak_rss_bytes": 8736768
+          },
+          "pdfbox": {
+            "accepted": false,
+            "code": "source_semantics",
+            "duration_ms": 2459,
+            "peak_rss_bytes": 110776320
+          },
+          "pdfjs": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 4080,
+            "peak_rss_bytes": 112791552
+          }
+        },
+        "gate_accepts": {
+          "full": false,
+          "qpdf_pdfbox": false,
+          "pdfbox_only": false
+        }
+      },
+      {
+        "case": "continuation_ordering_error",
+        "expected": "reject",
+        "validators": {
+          "qpdf": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 137,
+            "peak_rss_bytes": 8613888
+          },
+          "pdfbox": {
+            "accepted": false,
+            "code": "continuation_content",
+            "duration_ms": 2609,
+            "peak_rss_bytes": 114954240
+          },
+          "pdfjs": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 4427,
+            "peak_rss_bytes": 113807360
+          }
+        },
+        "gate_accepts": {
+          "full": false,
+          "qpdf_pdfbox": false,
+          "pdfbox_only": false
+        }
+      },
+      {
+        "case": "continuation_text_error",
+        "expected": "reject",
+        "validators": {
+          "qpdf": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 130,
+            "peak_rss_bytes": 8863744
+          },
+          "pdfbox": {
+            "accepted": false,
+            "code": "continuation_content",
+            "duration_ms": 2643,
+            "peak_rss_bytes": 110055424
+          },
+          "pdfjs": {
+            "accepted": false,
+            "code": "pdfjs_validation",
+            "duration_ms": 4229,
+            "peak_rss_bytes": 114081792
+          }
+        },
+        "gate_accepts": {
+          "full": false,
+          "qpdf_pdfbox": false,
+          "pdfbox_only": false
+        }
+      },
+      {
+        "case": "valid_pdf_wrong_committed_answer",
+        "expected": "reject",
+        "validators": {
+          "qpdf": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 135,
+            "peak_rss_bytes": 8810496
+          },
+          "pdfbox": {
+            "accepted": false,
+            "code": "generated_text_exact",
+            "duration_ms": 2668,
+            "peak_rss_bytes": 127270912
+          },
+          "pdfjs": {
+            "accepted": false,
+            "code": "pdfjs_validation",
+            "duration_ms": 3860,
+            "peak_rss_bytes": 112410624
+          }
+        },
+        "gate_accepts": {
+          "full": false,
+          "qpdf_pdfbox": false,
+          "pdfbox_only": false
+        }
+      },
+      {
+        "case": "untouched_source_returned",
+        "expected": "reject",
+        "validators": {
+          "qpdf": {
+            "accepted": true,
+            "code": "ok",
+            "duration_ms": 103,
+            "peak_rss_bytes": 8548352
+          },
+          "pdfbox": {
+            "accepted": false,
+            "code": "generated_text_exact",
+            "duration_ms": 2318,
+            "peak_rss_bytes": 99614720
+          },
+          "pdfjs": {
+            "accepted": false,
+            "code": "pdfjs_validation",
+            "duration_ms": 3847,
+            "peak_rss_bytes": 112451584
+          }
+        },
+        "gate_accepts": {
+          "full": false,
+          "qpdf_pdfbox": false,
+          "pdfbox_only": false
+        }
+      }
+    ],
+    "known_defects_accepted_by_qpdf_plus_pdfbox": [],
+    "critical_defects_uniquely_rejected_by_pdfjs": [],
+    "all_gate_variants_match_expected": {
+      "full": true,
+      "qpdf_pdfbox": true,
+      "pdfbox_only": true
+    }
+  }
+}

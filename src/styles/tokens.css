@@ -1,4 +1,5 @@
-:root {
+@scope (.legacy-root) {
+:scope {
   --color-pure-black: #000;
   --color-obsidian: #1a1a1a;
   --color-graphite: #333;
@@ -38,4 +39,5 @@
   --spacing-48: 48px;
   --radius: 2px;
   --shadow-sm: rgba(0, 0, 0, .04) 0 2px 4px;
+}
 }

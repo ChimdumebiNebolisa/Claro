@@ -1,0 +1,5 @@
+target/
+.pytest_cache/
+__pycache__/
+*.pyc
+benchmark-output-debug.json
