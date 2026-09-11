@@ -253,6 +253,7 @@ def test_local_container_smoke_applies_runtime_isolation_and_restart_storage() -
     container_run = smoke.split("def start_container", 1)[1].split("def assert_image_contract", 1)[
         0
     ]
+    assert '"CLAROS_PDF_ENGINE=openpdf"' in container_run
     assert "CLAROS_OPENAI_API_KEY=" not in container_run
 
 

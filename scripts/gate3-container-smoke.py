@@ -817,6 +817,8 @@ def start_container(image: str, *, volume_name: str, container_name: str) -> tup
         "--env",
         "CLAROS_LOCAL_STORAGE_PATH=/var/lib/claros",
         "--env",
+        "CLAROS_PDF_ENGINE=openpdf",
+        "--env",
         f"CLAROS_PUBLIC_ORIGIN={CONTAINER_ORIGIN}",
         "--env",
         f"CLAROS_COOKIE_SECRET={TEST_COOKIE_SECRET}",

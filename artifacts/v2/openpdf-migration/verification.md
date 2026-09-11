@@ -12,7 +12,7 @@
 - OpenPDF: 3.0.5
 - Apache FOP: 2.11
 - Apache PDFBox: 3.0.8
-- Jackson Databind: 2.20.0
+- Jackson Databind: 2.21.6
 - qpdf: 12.3.2 for local verification
 - Font: allowlisted `NotoSans-Regular.ttf`, SHA-256
   `b85c38ecea8a7cfb39c24e395a4007474fa5a4fc864f6ee33309eb4948d232d5`

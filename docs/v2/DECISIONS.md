@@ -425,7 +425,7 @@ the export rendering and final validation implementation. Python continues to
 own preflight, physical IR, question grounding, deterministic fitting, placement
 hashes, immutable object publication, and application state. The selected
 OpenPDF path replaces ReportLab/pypdf rendering with a strict Java 21 child
-process using OpenPDF 3.0.5, Apache FOP 2.11, PDFBox 3.0.8, Jackson 2.20.0, and
+process using OpenPDF 3.0.5, Apache FOP 2.11, PDFBox 3.0.8, Jackson 2.21.6, and
 the existing allowlisted Noto Sans Regular font.
 
 `CLAROS_PDF_ENGINE` accepts only `current` or `openpdf`. Selection is made once
